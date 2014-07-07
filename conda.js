@@ -91,8 +91,16 @@ function factory(api) {
         }
 
         Env.prototype.linked = function() {
-            return api(['list', '--prefix', this.prefix],
-                       'get', ['envs', this.name, 'linked']);
+            return api(['list', '--prefix', this.prefix], 'get', ['envs', this.name, 'linked']).then(function(fns) {
+                var promises = [];
+                for (var i = 0; i < fns.length; i++) {
+                    promises.push(Package.load(fns[i]));
+                }
+
+                return Promise.all(promises).then(function(pkgs) {
+                    return pkgs;
+                })
+            });
         };
 
         Env.prototype.revisions = function() {
@@ -130,11 +138,21 @@ function factory(api) {
     })();
 
     var Package = (function() {
-        function Package() {
+        function Package(fn, info) {
+            this.fn = fn;
+            this.info = info;
         }
 
+        Package.load = function(fn) {
+            return api(['info', fn + '.tar.bz2'], 'get', ['info', fn + '.tar.bz2']).then(function(info) {
+                info = info[fn + '.tar.bz2'];
+                var pkg = new Package(fn, info);
+                return pkg;
+            });
+        };
+
         return Package;
-    });
+    })();
 
     var info = function() {
         return api(['info'], 'get', ['info']);
@@ -143,6 +161,7 @@ function factory(api) {
     return {
         info: info,
         Env: Env,
+        Package: Package,
         API_ROOT: '/api/'
     };
 }
