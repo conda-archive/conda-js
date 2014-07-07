@@ -1,0 +1,7 @@
+{
+  "name": "conda",
+  "version": "0.0.1",
+  "dependencies": {
+    "promise": "^5.0.0"
+  }
+}
