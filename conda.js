@@ -9,6 +9,7 @@ if (typeof module === 'object' && typeof define !== 'function') {
     var api = function(cmdList, method, url, data) {
         return new Promise(function(fulfill, reject) {
             var params = cmdList.concat(['--json']);
+            console.log('Running', params)
             var conda = ChildProcess.spawn('conda', params, {});
             var buffer = [];
             conda.stdout.on('data', function(data) {
@@ -91,22 +92,42 @@ function factory(api) {
 
         Env.prototype.linked = function() {
             return api(['list', '--prefix', this.prefix],
-                       'get', [this.name, 'linked']);
+                       'get', ['envs', this.name, 'linked']);
         };
 
         Env.prototype.revisions = function() {
+            return api(['list', '--prefix', this.prefix, '--revisions'],
+                       'get', ['envs', this.name, 'revisions']);
         };
 
-        Env.prototype.install = function() {
+        Env.prototype.install = function(pkg) {
+            return api(['install', '--prefix', this.prefix, pkg],
+                       'get', ['envs', this.name, 'install', pkg]);
         };
 
-        Env.prototype.remove = function() {
+        Env.prototype.remove = function(pkg) {
+            return api(['remove', '--prefix', this.prefix, pkg],
+                       'get', ['envs', this.name, 'install', pkg]);
         };
 
         Env.create = function(name) {
         };
+
+        Env.getEnvs = function() {
+            return info().then(function(info) {
+                var envs = [new Env('root', info['default_prefix'])];
+                var prefixes = info['envs'];
+                for (var i = 0; i < prefixes.length; i++) {
+                    var prefix = prefixes[i];
+                    var name = prefix.split('/'); // Windows?
+                    name = name[name.length - 1];
+                    envs.push(new Env(name, prefix));
+                }
+                return envs;
+            });
+        };
         return Env;
-    });
+    })();
 
     var Package = (function() {
         function Package() {
@@ -121,6 +142,7 @@ function factory(api) {
 
     return {
         info: info,
+        Env: Env,
         API_ROOT: '/api/'
     };
 }
