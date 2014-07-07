@@ -1,7 +1,11 @@
 // Set up module to run in browser and in Node.js
 // Based loosely on https://github.com/umdjs/umd/blob/master/nodeAdapter.js
-if (typeof module === 'object' && typeof define !== 'function') {
-    // We are in Node.js
+if ((typeof module === 'object' && typeof define !== 'function') || window.atomRequire) {
+    // We are in Node.js or atom
+
+    if (window.atomRequire) {
+        var require = window.atomRequire;
+    }
 
     var ChildProcess = require('child_process');
     var Promise = require('promise');
@@ -12,7 +16,7 @@ if (typeof module === 'object' && typeof define !== 'function') {
             var conda = ChildProcess.spawn('conda', params, {});
             var buffer = [];
             conda.stdout.on('data', function(data) {
-                buffer.push(data);
+                buffer.push(data.toString());
             });
             conda.on('close', function() {
                 try {
@@ -204,10 +208,16 @@ function factory(api, progressApi) {
             this.isRoot = false;
         }
 
-        Env.prototype.linked = function() {
+        Env.prototype.linked = function(simple) {
+            if (typeof simple === "undefined") {
+                simple = false;
+            }
             var cmdList = ['list', '--prefix', this.prefix];
             var path = ['envs', this.name, 'linked'];
             return api(cmdList, 'get', path).then(function(fns) {
+                if (simple) {
+                    return fns;
+                }
                 var promises = [];
                 for (var i = 0; i < fns.length; i++) {
                     promises.push(Package.load(fns[i]));
@@ -296,6 +306,14 @@ function factory(api, progressApi) {
         return api(['info'], 'get', ['info']);
     };
 
+    var search = function(regex) {
+        var cmdList = ['search'];
+        if (typeof regex !== 'undefined' && regex !== null) {
+            cmdList.push(regex);
+        }
+        return api(cmdList, 'get', cmdList);
+    };
+
     var launch = function(command) {
         return api(['launch', command], 'get', ['launch', command]);
     };
@@ -303,6 +321,7 @@ function factory(api, progressApi) {
     return {
         info: info,
         launch: launch,
+        search: search,
         Env: Env,
         Package: Package,
         API_ROOT: '/api/',
