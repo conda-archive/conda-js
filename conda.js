@@ -38,16 +38,19 @@ if (typeof module === 'object' && typeof define !== 'function') {
         var buffer = [];
         var promise = new Promise(function(fulfill, reject) {
             conda.stdout.on('data', function(data) {
-                data = data.toString();
-                var rest = data;
+                var rest = data.toString();
+                if (rest.indexOf('\0') == -1) {
+                    progressing = false;
+                }
+
                 if (!progressing) {
                     buffer.push(data);
                     return;
                 }
-                while (rest.indexOf('\n') > -1 && progressing) {
-                    var dataEnd = rest.indexOf('\n') + 1;
+                while (rest.indexOf('\0') > -1 && progressing) {
+                    var dataEnd = rest.indexOf('\0');
                     var first = rest.slice(0, dataEnd);
-                    rest = rest.slice(dataEnd);
+                    rest = rest.slice(dataEnd + 1);
                     buffer.push(first);
                     var json = JSON.parse(buffer.join(''));
                     buffer = [];
@@ -163,15 +166,29 @@ else {
     // Returns Promise like api(), but this object has additional callbacks
     // for progress bars. Retrieves data via websocket.
     var progressApi = function(cmdList, url, data) {
-        var path = parse(cmdList, url, data);
-        var socket = io();
-        socket.emit('api', path);
-        socket.on('progress', function(progress) {
-            console.log(progress);
+        var callbacks = [];
+        var promise = new Promise(function(fulfill, reject) {
+            var path = parse(cmdList, url, data);
+            var socket = io();
+            socket.emit('api', path);
+            socket.on('progress', function(progress) {
+                console.log(progress)
+                promise.onProgress(progress);
+            });
+            socket.on('result', function(result) {
+                console.log(result)
+                fulfill(result);
+            });
         });
-        socket.on('result', function(result) {
-            console.log(result);
-        });
+        promise.onProgress = function(f) {
+            callbacks.push(f);
+        };
+        promise.progress = function(data) {
+            for (var i = 0; i < callbacks.length; i++) {
+                callbacks[i](data);
+            }
+        };
+        return promise;
     };
 
     window.conda = factory(api, progressApi);
@@ -225,7 +242,7 @@ function factory(api, progressApi) {
                 return api(cmdList, 'get', path, data);
             }
             else {
-                return socketApi(cmdList, 'get', path, data);
+                return progressApi(cmdList, path, data);
             }
         };
 
@@ -283,14 +300,9 @@ function factory(api, progressApi) {
         return api(['launch', command], 'get', ['launch', command]);
     };
 
-    var socketTest = function() {
-        return progressApi(['launch', 'test', '--json'], ['install']);
-    };
-
     return {
         info: info,
         launch: launch,
-        socketTest: socketTest,
         Env: Env,
         Package: Package,
         API_ROOT: '/api/',
