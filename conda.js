@@ -9,7 +9,6 @@ if (typeof module === 'object' && typeof define !== 'function') {
     var api = function(cmdList, method, url, data) {
         return new Promise(function(fulfill, reject) {
             var params = cmdList.concat(['--json']);
-            console.log('Running', params)
             var conda = ChildProcess.spawn('conda', params, {});
             var buffer = [];
             conda.stdout.on('data', function(data) {
@@ -29,9 +28,65 @@ if (typeof module === 'object' && typeof define !== 'function') {
         });
     };
 
+    // Returns Promise like api(), but this object has additional callbacks
+    // for progress bars. Retrieves data via ChildProcess.
+    var progressApi = function(cmdList, url, data) {
+        var callbacks = [];
+        var progressing = true;
+        var params = cmdList.concat(['--json']);
+        var conda = ChildProcess.spawn('conda', params, {});
+        var buffer = [];
+        var promise = new Promise(function(fulfill, reject) {
+            conda.stdout.on('data', function(data) {
+                data = data.toString();
+                var rest = data;
+                if (!progressing) {
+                    buffer.push(data);
+                    return;
+                }
+                while (rest.indexOf('\n') > -1 && progressing) {
+                    var dataEnd = rest.indexOf('\n') + 1;
+                    var first = rest.slice(0, dataEnd);
+                    rest = rest.slice(dataEnd);
+                    buffer.push(first);
+                    var json = JSON.parse(buffer.join(''));
+                    buffer = [];
+                    promise.progress(json);
+
+                    if (json.finished === true) {
+                        progressing = false;
+                    }
+                }
+            });
+            conda.on('close', function() {
+                try {
+                    fulfill(JSON.parse(buffer.join('')));
+                }
+                catch(ex) {
+                    reject({
+                        'exception': ex,
+                        'result': buffer.join('')
+                    });
+                }
+            });
+        });
+        promise.onProgress = function(f) {
+            callbacks.push(f);
+        };
+        promise.progress = function(data) {
+            for (var i = 0; i < callbacks.length; i++) {
+                callbacks[i](data);
+            }
+        };
+        return promise;
+    };
+
     if (process.argv.length == 3 && process.argv[2] == '--server') {
         var express = require('express');
         var app = express();
+        var http = require('http').Server(app);
+        var io = require('socket.io')(http);
+
         process.argv = [];
         console.log('running as server')
 
@@ -42,6 +97,9 @@ if (typeof module === 'object' && typeof define !== 'function') {
         app.get('/conda.js', function(req, res) {
             res.sendfile(__dirname + '/conda.js');
         });
+        app.get('/test.js', function(req, res) {
+            res.sendfile(__dirname + '/test.js');
+        });
         app.get('/api/*', function(req, res) {
             var path = req.path.slice(5);
             var parts = path.split('/');
@@ -51,39 +109,88 @@ if (typeof module === 'object' && typeof define !== 'function') {
                 res.send(JSON.stringify(data));
             });
         });
-        app.listen(8000);
+
+        io.on('connection', function(socket) {
+            console.log('connected')
+            socket.on('api', function(data) {
+                var path = data.path;
+                var parts = path.split('/').map(decodeURIComponent);
+
+                var progress = progressApi(parts)
+                progress.onProgress(function(progress) {
+                    socket.emit('progress', progress);
+                });
+                progress.done(function(data) {
+                    socket.emit('result', data);
+                });
+            })
+        });
+
+        http.listen(8000);
     }
 
-    module.exports = factory(api);
+    module.exports = factory(api, progressApi);
 }
 else {
     // We are in the browser
-    var api = function(cmdList, method, url) {
+    var parse = function(cmdList, url, data) {
         var parts = url;
         if (window.conda.DEV_SERVER) {
             parts = cmdList;
         }
 
+        if (typeof data === "undefined") {
+            data = {};
+        }
+
         var path = parts.map(encodeURIComponent).join('/');
+        return {
+            data: data,
+            path: path
+        }
+    };
+
+    var api = function(cmdList, method, url, data) {
+        var path = parse(cmdList, url, data);
         return Promise.resolve($.ajax({
+            data: path.data,
             dataType: 'json',
             type: method,
-            url: window.conda.API_ROOT + path
+            url: window.conda.API_ROOT + path.path
         }));
     };
 
-    window.conda = factory(api);
+    // Returns Promise like api(), but this object has additional callbacks
+    // for progress bars. Retrieves data via websocket.
+    var progressApi = function(cmdList, url, data) {
+        var path = parse(cmdList, url, data);
+        var socket = io();
+        socket.emit('api', path);
+        socket.on('progress', function(progress) {
+            console.log(progress);
+        });
+        socket.on('result', function(result) {
+            console.log(result);
+        });
+    };
+
+    window.conda = factory(api, progressApi);
 }
 
-function factory(api) {
+function factory(api, progressApi) {
     var Env = (function() {
         function Env(name, prefix) {
             this.name = name;
             this.prefix = prefix;
+
+            this.isDefault = false;
+            this.isRoot = false;
         }
 
         Env.prototype.linked = function() {
-            return api(['list', '--prefix', this.prefix], 'get', ['envs', this.name, 'linked']).then(function(fns) {
+            var cmdList = ['list', '--prefix', this.prefix];
+            var path = ['envs', this.name, 'linked'];
+            return api(cmdList, 'get', path).then(function(fns) {
                 var promises = [];
                 for (var i = 0; i < fns.length; i++) {
                     promises.push(Package.load(fns[i]));
@@ -100,9 +207,26 @@ function factory(api) {
                        'get', ['envs', this.name, 'revisions']);
         };
 
-        Env.prototype.install = function(pkg) {
-            return api(['install', '--prefix', this.prefix, pkg],
-                       'get', ['envs', this.name, 'install', pkg]);
+        Env.prototype.install = function(pkg, options) {
+            if (typeof options === "undefined") {
+                options = { progress: false };
+            }
+            if (typeof options.progress === "undefined") {
+                options.progress = false;
+            }
+
+            var cmdList = ['install', '--prefix', this.prefix, pkg];
+            var path = ['envs', this.name, 'install', pkg];
+            var data = {};
+            if (!options.progress) {
+                cmdList.push('--quiet');
+                data.quiet = true;
+
+                return api(cmdList, 'get', path, data);
+            }
+            else {
+                return socketApi(cmdList, 'get', path, data);
+            }
         };
 
         Env.prototype.remove = function(pkg) {
@@ -123,6 +247,11 @@ function factory(api) {
                     name = name[name.length - 1];
                     envs.push(new Env(name, prefix));
                 }
+
+                // envs.each(function(env) {
+                //     env.isDefault = env.prefix == info['default_prefix'];
+                //     env.isRoot = env.prefix == info['root_prefix'];
+                // });
                 return envs;
             });
         };
@@ -150,8 +279,18 @@ function factory(api) {
         return api(['info'], 'get', ['info']);
     };
 
+    var launch = function(command) {
+        return api(['launch', command], 'get', ['launch', command]);
+    };
+
+    var socketTest = function() {
+        return progressApi(['launch', 'test', '--json'], ['install']);
+    };
+
     return {
         info: info,
+        launch: launch,
+        socketTest: socketTest,
         Env: Env,
         Package: Package,
         API_ROOT: '/api/',
