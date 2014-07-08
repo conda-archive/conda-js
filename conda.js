@@ -471,7 +471,25 @@ function factory(api, progressApi) {
         return api(['launch', command], 'get', ['launch', command]);
     };
 
+    var clean = function(options) {
+        options = defaultOptions(options, {});
+        var cmdList = makeFlags(options, {
+            dryRun: false,
+            indexCache: false,
+            lock: false,
+            tarballs: false,
+            packages: false
+        });
+
+        if (!(indexCache || lock || tarballs || packages)) {
+            throw new CondaError("conda.clean: at least one of indexCache, lock, tarballs, or packages required");
+        }
+
+        return api(['clean'].concat(cmdList), 'post', ['clean'], options);
+    };
+
     return {
+        clean: clean,
         info: info,
         launch: launch,
         search: search,
