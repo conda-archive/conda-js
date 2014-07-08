@@ -313,7 +313,7 @@ function factory(api, progressApi) {
                 cmdList.push('--quiet');
                 data.quiet = true;
 
-                return api(cmdList, 'get', path, data);
+                return api(cmdList, 'post', path, data);
             }
             else {
                 return progressApi(cmdList, path, data);
@@ -322,15 +322,45 @@ function factory(api, progressApi) {
 
         Env.prototype.remove = function(pkg) {
             return api(['remove', '--prefix', this.prefix, pkg],
-                       'get', ['envs', this.name, 'install', pkg]);
+                       'post', ['envs', this.name, 'install', pkg]);
         };
 
-        Env.create = function(name) {
+        Env.prototype.clone = function(options) {
+            var result = nameOrPrefixOptions("Env.clone", options, {});
+            options = result.options;
+
+            var data = options.data;
+            var cmdList = ['create', '--clone', this.prefix];
+            cmdList = cmdList.concat(options.cmdList);
+
+            return api(cmdList, 'post', ['env', this.prefix, 'clone'], data);
+        };
+
+        Env.prototype.removeEnv = function() {
+            return progressApi(['remove', '--all', '--prefix', this.prefix],
+                               ['envs', this.name, 'delete'], {});
+        };
+
+        Env.create = function(options) {
+            var result = nameOrPrefixOptions("Env.create", options, {
+                packages: []
+            });
+            options = result.options;
+
+            if (options.packages.length === 0) {
+                throw new CondaError("Env.create: at least one package required");
+            }
+
+            var data = options.data;
+            var cmdList = ['create'];
+            cmdList = cmdList.concat(options.cmdList);
+            cmdList = cmdList.concat(options.packages);
         };
 
         Env.getEnvs = function() {
             return info().then(function(info) {
                 var envs = [new Env('root', info['default_prefix'])];
+
                 var prefixes = info['envs'];
                 for (var i = 0; i < prefixes.length; i++) {
                     var prefix = prefixes[i];
@@ -339,10 +369,10 @@ function factory(api, progressApi) {
                     envs.push(new Env(name, prefix));
                 }
 
-                // envs.each(function(env) {
-                //     env.isDefault = env.prefix == info['default_prefix'];
-                //     env.isRoot = env.prefix == info['root_prefix'];
-                // });
+                envs.forEach(function(env) {
+                    env.isDefault = env.prefix == info['default_prefix'];
+                    env.isRoot = env.prefix == info['root_prefix'];
+                });
                 return envs;
             });
         };
