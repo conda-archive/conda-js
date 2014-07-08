@@ -1,9 +1,9 @@
 // Set up module to run in browser and in Node.js
 // Based loosely on https://github.com/umdjs/umd/blob/master/nodeAdapter.js
-if ((typeof module === 'object' && typeof define !== 'function') || window.atomRequire) {
+if ((typeof module === 'object' && typeof define !== 'function') || (window && window.atomRequire)) {
     // We are in Node.js or atom
 
-    if (window.atomRequire) {
+    if (typeof window !== "undefined" && window.atomRequire) {
         var require = window.atomRequire;
     }
 
@@ -95,7 +95,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || window.atomR
         var io = require('socket.io')(http);
 
         process.argv = [];
-        console.log('running as server')
+        console.log('running as server');
 
         var fs = require('fs');
         app.get('/', function(req, res) {
@@ -108,9 +108,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || window.atomR
             res.sendfile(__dirname + '/test.js');
         });
         app.get('/api/*', function(req, res) {
-            var path = req.path.slice(5);
-            var parts = path.split('/');
-            parts = parts.map(decodeURIComponent);
+            var parts = req.param('command');
             console.log('Handling', parts);
             api(parts).then(function(data) {
                 res.send(JSON.stringify(data));
@@ -118,19 +116,26 @@ if ((typeof module === 'object' && typeof define !== 'function') || window.atomR
         });
 
         io.on('connection', function(socket) {
-            console.log('connected')
+            console.log('connected');
             socket.on('api', function(data) {
-                var path = data.path;
-                var parts = path.split('/').map(decodeURIComponent);
+                var parts = data.data.command;
 
-                var progress = progressApi(parts)
+                var progress = progressApi(parts);
                 progress.onProgress(function(progress) {
                     socket.emit('progress', progress);
                 });
                 progress.done(function(data) {
                     socket.emit('result', data);
+                    socket.disconnect();
                 });
-            })
+            });
+            socket.on('disconnect', function(data) {
+                socket.disconnect();
+            });
+        });
+
+        io.on('disconnect', function() {
+            console.log('disconnected');
         });
 
         http.listen(8000);
@@ -143,7 +148,12 @@ else {
     var parse = function(cmdList, url, data) {
         var parts = url;
         if (window.conda.DEV_SERVER) {
-            parts = cmdList;
+            return {
+                path: '',
+                data: {
+                    command: cmdList
+                }
+            }
         }
 
         if (typeof data === "undefined") {
@@ -181,6 +191,7 @@ else {
             });
             socket.on('result', function(result) {
                 console.log(result)
+                socket.disconnect();
                 fulfill(result);
             });
         });
