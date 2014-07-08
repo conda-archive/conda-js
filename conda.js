@@ -158,7 +158,7 @@ else {
                 data: {
                     command: cmdList
                 }
-            }
+            };
         }
 
         if (typeof data === "undefined") {
@@ -169,7 +169,7 @@ else {
         return {
             data: data,
             path: path
-        }
+        };
     };
 
     var api = function(cmdList, method, url, data) {
@@ -191,11 +191,11 @@ else {
             var socket = io();
             socket.emit('api', path);
             socket.on('progress', function(progress) {
-                console.log(progress)
+                console.log(progress);
                 promise.onProgress(progress);
             });
             socket.on('result', function(result) {
-                console.log(result)
+                console.log(result);
                 socket.disconnect();
                 fulfill(result);
             });
@@ -259,13 +259,13 @@ function factory(api, progressApi) {
             options: options,
             data: data,
             cmdList: cmdList
-        }
+        };
     };
 
     var makeFlags = function(options, flags) {
         // converts a name like useIndexCache to use-index-cache
         var _convert = function(f) {
-            return f.replace(/([A-Z])/, function(a, b) { return "-" + b.toLocaleLowerCase() });
+            return f.replace(/([A-Z])/, function(a, b) { return "-" + b.toLocaleLowerCase(); });
         };
 
         var cmdList = [];
@@ -321,7 +321,7 @@ function factory(api, progressApi) {
 
                 return Promise.all(promises).then(function(pkgs) {
                     return pkgs;
-                })
+                });
             });
         };
 
@@ -368,7 +368,7 @@ function factory(api, progressApi) {
                 .concat(cmdList)
                 .concat(options.packages);
 
-            return api(cmdList, 'post', ['envs', this.name, 'update'], options)
+            return api(cmdList, 'post', ['envs', this.name, 'update'], options);
         };
 
         Env.prototype.remove = function(pkg) {
@@ -410,9 +410,9 @@ function factory(api, progressApi) {
 
         Env.getEnvs = function() {
             return info().then(function(info) {
-                var envs = [new Env('root', info['default_prefix'])];
+                var envs = [new Env('root', info.default_prefix)];
 
-                var prefixes = info['envs'];
+                var prefixes = info.envs;
                 for (var i = 0; i < prefixes.length; i++) {
                     var prefix = prefixes[i];
                     var name = prefix.split('/'); // TODO Windows?
@@ -421,8 +421,8 @@ function factory(api, progressApi) {
                 }
 
                 envs.forEach(function(env) {
-                    env.isDefault = env.prefix == info['default_prefix'];
-                    env.isRoot = env.prefix == info['root_prefix'];
+                    env.isDefault = env.prefix == info.default_prefix;
+                    env.isRoot = env.prefix == info.root_prefix;
                 });
                 return envs;
             });
@@ -467,7 +467,7 @@ function factory(api, progressApi) {
         var ALLOWED_KEYS = ['channels', 'disallow', 'create_default_packages',
             'track_features', 'envs_dirs', 'always_yes', 'allow_softlinks', 'changeps1',
             'use_pip', 'binstar_upload', 'binstar_personal', 'show_channel_urls',
-            'allow_other_channels', 'ssl_verify']
+            'allow_other_channels', 'ssl_verify'];
 
         function Config(options) {
             options = defaultOptions(options, {
@@ -519,13 +519,13 @@ function factory(api, progressApi) {
                     return {
                         value: result.get[key],
                         set: true
-                    }
+                    };
                 }
                 else {
                     return {
                         value: undefined,
                         set: false
-                    }
+                    };
                 }
             });
         };
@@ -593,7 +593,7 @@ function factory(api, progressApi) {
         options = defaultOptions(options, {
             regex: null,
             spec: null
-        })
+        });
         var cmdList = ['search'];
 
         if (options.regex && options.spec) {
@@ -605,7 +605,7 @@ function factory(api, progressApi) {
         }
         if (options.spec !== null) {
             cmdList.push(spec);
-            cmdList.push('--spec')
+            cmdList.push('--spec');
         }
         return api(cmdList, 'get', cmdList);
     };
