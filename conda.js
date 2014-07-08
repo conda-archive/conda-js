@@ -257,6 +257,28 @@ function factory(api, progressApi) {
         }
     };
 
+    var makeFlags = function(options, flags) {
+        // converts a name like useIndexCache to use-index-cache
+        var _convert = function(f) {
+            return f.replace(/([A-Z])/, function(a, b) { return "-" + b.toLocaleLowerCase() });
+        };
+
+        var cmdList = [];
+        for (var flag in flags) {
+            if (flags.hasOwnProperty(flag)) {
+                if (typeof options[flag] === "undefined") {
+                    options[flag] = flags[flag];
+                }
+
+                if (options[flag]) {
+                    cmdList.push('--' + _convert(flag));
+                }
+            }
+        }
+
+        return cmdList;
+    };
+
     var CondaError = (function() {
         function CondaError(message) {
             this.message = message;
@@ -317,6 +339,31 @@ function factory(api, progressApi) {
             else {
                 return progressApi(cmdList, path, data);
             }
+        };
+
+        Env.prototype.update = function(options) {
+            options = defaultOptions(options, {
+                packages: []
+            });
+            cmdList = makeFlags(options, {
+                dryRun: false,
+                unknown: false,
+                noDeps: false,
+                useIndexCache: false,
+                useLocal: false,
+                noPin: false,
+                all: false
+            });
+
+            if (options.packages.length === 0 && !options.all) {
+                throw new CondaError("Env.update: must specify packages to update or all");
+            }
+
+            var cmdList = ['update', '--prefix', this.prefix]
+                .concat(cmdList)
+                .concat(options.packages);
+
+            return api(cmdList, 'post', ['envs', this.name, 'update'], options)
         };
 
         Env.prototype.remove = function(pkg) {
