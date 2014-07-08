@@ -448,12 +448,59 @@ function factory(api, progressApi) {
     })();
 
     var Config = (function() {
-        var _singleton = null;
-        var ALLOWED_KEYS = ['channels', 'disallow', 'create_default_packages',
-'track_features', 'envs_dirs', 'always_yes', 'allow_softlinks', 'changeps1', 'use_pip', 'binstar_upload', 'binstar_personal', 'show_channel_urls', 'allow_other_channels', 'ssl_verify']
+        var _warn_result = function(result) {
+            if (result.warnings && result.warnings.length) {
+                console.log("Warnings for conda config:");
+                console.log(result.warnings);
+            }
+            return result;
+        };
+        var _merge = function(dest, src) {
+            for (var key in src) {
+                if (src.hasOwnProperty(key)) {
+                    dest[key] = src[key];
+                }
+            }
 
-        function Config() {
+            return dest;
+        };
+        var ALLOWED_KEYS = ['channels', 'disallow', 'create_default_packages',
+            'track_features', 'envs_dirs', 'always_yes', 'allow_softlinks', 'changeps1',
+            'use_pip', 'binstar_upload', 'binstar_personal', 'show_channel_urls',
+            'allow_other_channels', 'ssl_verify']
+
+        function Config(options) {
+            options = defaultOptions(options, {
+                system: false,
+                file: null
+            });
+            this.system = options.system;
+            this.file = options.file;
+            this.data = {};
+            this.cmdList = ['config'];
+
+            if (options.system && options.file !== null) {
+                throw new CondaError("Config: at most one of system, file allowed");
+            }
+
+            if (options.system) {
+                this.cmdList.push('--system');
+                this.data.system = true;
+            }
+            else if (options.file !== null) {
+                this.cmdList.push('--file');
+                this.cmdList.push(options.file);
+                this.data.file = options.file;
+            }
         }
+
+        Config.prototype.rcPath = function() {
+            var call = api(this.cmdList.concat(['--get']),
+                           'get', ['config', 'getAll'], this.data);
+            return call.then(function(result) {
+                return result.rc_path;
+            });
+        };
 
         Config.prototype.get = function(key) {
             if (ALLOWED_KEYS.indexOf(key) === -1) {
@@ -461,11 +508,48 @@ function factory(api, progressApi) {
                     "Config.get: key " + key + " not allowed. Key must be one of "
                         + ALLOWED_KEYS.join(', '));
             }
-            return api(['config', '--get', key], 'get', ['config', 'get', key]);
+            var call = api(this.cmdList.concat(['--get', key]),
+                           'get', ['config', 'getAll', key], this.data);
+            return call.then(function(result) {
+                if (result.warnings.length) {
+                    console.log("Warnings for conda config:");
+                    console.log(result.warnings);
+                }
+                if (typeof result.get[key] !== "undefined") {
+                    return {
+                        value: result.get[key],
+                        set: true
+                    }
+                }
+                else {
+                    return {
+                        value: undefined,
+                        set: false
+                    }
+                }
+            });
         };
 
         Config.prototype.getAll = function() {
-            return api(['config', '--get'], 'get', ['config', 'getAll']);
+            var call = api(this.cmdList.concat(['--get']),
+                           'get', ['config', 'getAll'], this.data);
+            return call.then(function(result) {
+                return result.get;
+            });
+        };
+
+        // TODO disallow non iterable keys
+        Config.prototype.add = function(key, value) {
+            if (ALLOWED_KEYS.indexOf(key) === -1) {
+                throw new CondaError(
+                    "Config.set: key " + key + " not allowed. Key must be one of "
+                        + ALLOWED_KEYS.join(', '));
+            }
+            // TODO use PUT? (should be idempotent)
+            var call = api(this.cmdList.concat(['--add', key, value, '--force']),
+                           'post', ['config', 'add', key],
+                           _merge({ value: value }, this.data));
+            return call.then(_warn_result);
         };
 
         Config.prototype.set = function(key, value) {
@@ -474,9 +558,10 @@ function factory(api, progressApi) {
                     "Config.set: key " + key + " not allowed. Key must be one of "
                         + ALLOWED_KEYS.join(', '));
             }
-            // TODO use PUT/DELETE methods?
-            return api(['config', '--set', key, value],
-                       'post', ['config', 'set', key], { value: value });
+            var call = api(this.cmdList.concat(['--set', key, value, '--force']),
+                           'post', ['config', 'set', key],
+                           _merge({ value: value }, this.data));
+            return call.then(_warn_result);
         };
 
         Config.prototype.remove = function(key, value) {
@@ -485,13 +570,16 @@ function factory(api, progressApi) {
                     "Config.remove: key " + key + " not allowed. Key must be one of "
                         + ALLOWED_KEYS.join(', '));
             }
-            return api(['config', '--remove', key, value],
-                       'post', ['config', 'remove', key], { value: value });
+            var call = api(this.cmdList.concat(['--remove', key, value, '--force']),
+                           'post', ['config', 'remove', key],
+                           _merge({ value: value }, this.data));
+            return call.then(_warn_result);
         };
 
         Config.prototype.removeKey = function(key) {
-            return api(['config', '--remove-key', key],
-                       'post', ['config', 'removeKey', key]);
+            var call = api(this.cmdList.concat(['--remove-key', key, value, '--force']),
+                           'post', ['config', 'removeKey', key]);
+            return call.then(_warn_result);
         };
 
         return Config;
