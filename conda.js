@@ -90,6 +90,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
 
     if (process.argv.length == 3 && process.argv[2] == '--server') {
         var express = require('express');
+        var bodyParser = require('body-parser');
         var app = express();
         var http = require('http').Server(app);
         var io = require('socket.io')(http);
@@ -97,7 +98,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
         process.argv = [];
         console.log('running as server');
 
-        var fs = require('fs');
+        app.use(bodyParser.urlencoded({ extended: false }));
         app.get('/', function(req, res) {
             res.sendfile(__dirname + '/test.html');
         });
@@ -107,8 +108,12 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
         app.get('/test.js', function(req, res) {
             res.sendfile(__dirname + '/test.js');
         });
-        app.get('/api/*', function(req, res) {
+        app.all('/api/*', function(req, res) {
             var parts = req.param('command');
+            if (typeof parts === "undefined") {
+                // POST request
+                parts = req.param('command[]');
+            }
             console.log('Handling', parts);
             api(parts).then(function(data) {
                 res.send(JSON.stringify(data));
