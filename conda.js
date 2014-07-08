@@ -429,6 +429,7 @@ function factory(api, progressApi) {
         info: info,
         launch: launch,
         search: search,
+        CondaError: CondaError,
         Env: Env,
         Package: Package,
         API_ROOT: '/api/',
