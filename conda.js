@@ -400,10 +400,23 @@ function factory(api, progressApi) {
         return api(['info'], 'get', ['info']);
     };
 
-    var search = function(regex) {
+    var search = function(options) {
+        options = defaultOptions(options, {
+            regex: null,
+            spec: null
+        })
         var cmdList = ['search'];
-        if (typeof regex !== 'undefined' && regex !== null) {
+
+        if (options.regex && options.spec) {
+            throw new CondaError("conda.search: only one of regex and spec allowed");
+        }
+
+        if (options.regex !== null) {
             cmdList.push(regex);
+        }
+        if (options.spec !== null) {
+            cmdList.push(spec);
+            cmdList.push('--spec')
         }
         return api(cmdList, 'get', cmdList);
     };
