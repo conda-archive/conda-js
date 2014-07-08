@@ -232,7 +232,6 @@ function factory(api, progressApi) {
         options = defaultOptions(options, defaults);
         if (!(options.name || options.prefix)) {
             throw new CondaError(name + ": either name or prefix required");
-            };
         }
         if (options.name && options.prefix) {
             throw new CondaError(name + ": exactly one of name or prefix allowed");
