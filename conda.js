@@ -442,6 +442,56 @@ function factory(api, progressApi) {
         return Package;
     })();
 
+    var Config = (function() {
+        var _singleton = null;
+        var ALLOWED_KEYS = ['channels', 'disallow', 'create_default_packages',
+'track_features', 'envs_dirs', 'always_yes', 'allow_softlinks', 'changeps1', 'use_pip', 'binstar_upload', 'binstar_personal', 'show_channel_urls', 'allow_other_channels', 'ssl_verify']
+
+        function Config() {
+        }
+
+        Config.prototype.get = function(key) {
+            if (ALLOWED_KEYS.indexOf(key) === -1) {
+                throw new CondaError(
+                    "Config.get: key " + key + " not allowed. Key must be one of "
+                        + ALLOWED_KEYS.join(', '));
+            }
+            return api(['config', '--get', key], 'get', ['config', 'get', key]);
+        };
+
+        Config.prototype.getAll = function() {
+            return api(['config', '--get'], 'get', ['config', 'getAll']);
+        };
+
+        Config.prototype.set = function(key, value) {
+            if (ALLOWED_KEYS.indexOf(key) === -1) {
+                throw new CondaError(
+                    "Config.set: key " + key + " not allowed. Key must be one of "
+                        + ALLOWED_KEYS.join(', '));
+            }
+            // TODO use PUT/DELETE methods?
+            return api(['config', '--set', key, value],
+                       'post', ['config', 'set', key], { value: value });
+        };
+
+        Config.prototype.remove = function(key, value) {
+            if (ALLOWED_KEYS.indexOf(key) === -1) {
+                throw new CondaError(
+                    "Config.remove: key " + key + " not allowed. Key must be one of "
+                        + ALLOWED_KEYS.join(', '));
+            }
+            return api(['config', '--remove', key, value],
+                       'post', ['config', 'remove', key], { value: value });
+        };
+
+        Config.prototype.removeKey = function(key) {
+            return api(['config', '--remove-key', key],
+                       'post', ['config', 'removeKey', key]);
+        };
+
+        return Config;
+    })();
+
     var info = function() {
         return api(['info'], 'get', ['info']);
     };
@@ -494,6 +544,7 @@ function factory(api, progressApi) {
         launch: launch,
         search: search,
         CondaError: CondaError,
+        Config: Config,
         Env: Env,
         Package: Package,
         API_ROOT: '/api/',
