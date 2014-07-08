@@ -210,6 +210,66 @@ else {
 }
 
 function factory(api, progressApi) {
+    var defaultOptions = function(options, defaults) {
+        if (typeof options === "undefined" || options === null) {
+            return defaults;
+        }
+        for (var key in defaults) {
+            if (defaults.hasOwnProperty(key)) {
+                if (!(key in options)) {
+                    options[key] = defaults[key];
+                }
+            }
+        }
+
+        return options;
+    };
+
+    var nameOrPrefixOptions = function(name, options, defaults) {
+        defaults.name = null;
+        defaults.prefix = null;
+
+        options = defaultOptions(options, defaults);
+        if (!(options.name || options.prefix)) {
+            throw new CondaError(name + ": either name or prefix required");
+            };
+        }
+        if (options.name && options.prefix) {
+            throw new CondaError(name + ": exactly one of name or prefix allowed");
+        }
+
+        var data = {};
+        var cmdList = [];
+        if (options.name) {
+            data.name = options.name;
+            cmdList.push('--name');
+            cmdList.push(options.name);
+        }
+        if (options.prefix) {
+            data.prefix = options.prefix;
+            cmdList.push('--prefix');
+            cmdList.push(options.prefix);
+        }
+
+        return {
+            options: options,
+            data: data,
+            cmdList: cmdList
+        }
+    };
+
+    var CondaError = (function() {
+        function CondaError(message) {
+            this.message = message;
+        }
+
+        CondaError.prototype.toString = function() {
+            return "CondaError: " + this.message;
+        };
+
+        return CondaError;
+    })();
+
     var Env = (function() {
         function Env(name, prefix) {
             this.name = name;
@@ -219,14 +279,13 @@ function factory(api, progressApi) {
             this.isRoot = false;
         }
 
-        Env.prototype.linked = function(simple) {
-            if (typeof simple === "undefined") {
-                simple = false;
-            }
+        Env.prototype.linked = function(options) {
+            options = defaultOptions(options, { simple: false });
+
             var cmdList = ['list', '--prefix', this.prefix];
             var path = ['envs', this.name, 'linked'];
             return api(cmdList, 'get', path).then(function(fns) {
-                if (simple) {
+                if (options.simple) {
                     return fns;
                 }
                 var promises = [];
@@ -246,13 +305,7 @@ function factory(api, progressApi) {
         };
 
         Env.prototype.install = function(pkg, options) {
-            if (typeof options === "undefined") {
-                options = { progress: false };
-            }
-            if (typeof options.progress === "undefined") {
-                options.progress = false;
-            }
-
+            options = defaultOptions(options, { progress: false });
             var cmdList = ['install', '--prefix', this.prefix, pkg];
             var path = ['envs', this.name, 'install', pkg];
             var data = {};
