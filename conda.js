@@ -10,25 +10,61 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
     var ChildProcess = require('child_process');
     var Promise = require('promise');
 
-    var api = function(cmdList, method, url, data) {
+    // converts a name like useIndexCache to --use-index-cache
+    var __convert = function(f) {
+        return "--" + f.replace(/([A-Z])/, function(a, b) { return "-" + b.toLocaleLowerCase(); });
+    };
+
+    var api = function(command, flags, positional) {
+        if (typeof flags === "undefined") { flags = {}; }
+        if (typeof positional === "undefined") { positional = []; }
+
         return new Promise(function(fulfill, reject) {
-            var params = cmdList.concat(['--json']);
-            var conda = ChildProcess.spawn('conda', params, {});
-            var buffer = [];
-            conda.stdout.on('data', function(data) {
-                buffer.push(data.toString());
-            });
-            conda.on('close', function() {
-                try {
-                    fulfill(JSON.parse(buffer.join('')));
+            var cmdList = [command];
+
+            for (var key in flags) {
+                if (flags.hasOwnProperty(key)) {
+                    var value = flags[key];
+                    if (value !== false) {
+                        cmdList.push(__convert(key));
+
+                        if (Array.isArray(value)) {
+                            cmdList = cmdList.concat(value);
+                        }
+                        else if (value !== true) {
+                            cmdList.push(value);
+                        }
+                    }
                 }
-                catch(ex) {
-                    reject({
-                        'exception': ex,
-                        'result': buffer.join('')
-                    });
-                }
-            });
+            }
+
+            cmdList = cmdList.concat(positional);
+            cmdList.push('--json');
+
+            try {
+                var conda = ChildProcess.spawn('conda', cmdList, {});
+                var buffer = [];
+                conda.stdout.setEncoding('utf8');
+                conda.stdout.on('data', function(data) {
+                    buffer.push(data);
+                });
+                conda.on('close', function() {
+                    try {
+                        fulfill(JSON.parse(buffer.join('')));
+                    }
+                    catch (ex) {
+                        reject({
+                            'exception': ex,
+                            'result': buffer.join('')
+                        });
+                    }
+                });
+            }
+            catch (ex) {
+                reject({
+                    'exception': ex
+                })
+            }
         });
     };
 
@@ -88,97 +124,35 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
         return promise;
     };
 
-    if (process.argv.length == 3 && process.argv[2] == '--server') {
-        var express = require('express');
-        var bodyParser = require('body-parser');
-        var app = express();
-        var http = require('http').Server(app);
-        var io = require('socket.io')(http);
-
-        process.argv = [];
-        console.log('running as server');
-
-        app.use(bodyParser.urlencoded({ extended: false }));
-        app.get('/', function(req, res) {
-            res.sendfile(__dirname + '/test.html');
-        });
-        app.get('/conda.js', function(req, res) {
-            res.sendfile(__dirname + '/conda.js');
-        });
-        app.get('/test.js', function(req, res) {
-            res.sendfile(__dirname + '/test.js');
-        });
-        app.all('/api/*', function(req, res) {
-            var parts = req.param('command');
-            if (typeof parts === "undefined") {
-                // POST request
-                parts = req.param('command[]');
-            }
-            console.log('Handling', parts);
-            api(parts).then(function(data) {
-                res.send(JSON.stringify(data));
-            });
-        });
-
-        io.on('connection', function(socket) {
-            console.log('connected');
-            socket.on('api', function(data) {
-                var parts = data.data.command;
-
-                var progress = progressApi(parts);
-                progress.onProgress(function(progress) {
-                    socket.emit('progress', progress);
-                });
-                progress.done(function(data) {
-                    socket.emit('result', data);
-                    socket.disconnect();
-                });
-            });
-            socket.on('disconnect', function(data) {
-                socket.disconnect();
-            });
-        });
-
-        io.on('disconnect', function() {
-            console.log('disconnected');
-        });
-
-        http.listen(8000);
-    }
-
     module.exports = factory(api, progressApi);
+    module.exports.api = api;
 }
 else {
     // We are in the browser
-    var parse = function(cmdList, url, data) {
-        var parts = url;
-        if (window.conda.DEV_SERVER) {
-            return {
-                path: '',
-                data: {
-                    command: cmdList
-                }
-            };
+
+    var api = function(command, flags, positional) {
+        // URL structure: /api/command
+        // Flags are GET query string or POST body
+        // Positional is in query string or POST body
+
+        // Translation of JS flag camelCase to command line flag
+        // dashed-version occurs server-side
+
+        if (typeof flags === "undefined") {
+            flags = {};
+        }
+        if (typeof positional === "undefined") {
+            positional = [];
         }
 
-        if (typeof data === "undefined") {
-            data = {};
-        }
+        var data = flags;
+        data.positional = positional;
 
-        var path = parts.map(encodeURIComponent).join('/');
-        return {
-            data: data,
-            path: path
-        };
-    };
-
-    var api = function(cmdList, method, url, data) {
-        var path = parse(cmdList, url, data);
         return Promise.resolve($.ajax({
-            data: path.data,
+            data: data,
             dataType: 'json',
-            type: method,
-            url: window.conda.API_ROOT + path.path
+            type: 'get',
+            url: window.conda.API_ROOT + command
         }));
     };
 
@@ -221,7 +195,7 @@ function factory(api, progressApi) {
         }
         for (var key in defaults) {
             if (defaults.hasOwnProperty(key)) {
-                if (!(key in options)) {
+                if (typeof options[key] === "undefined") {
                     options[key] = defaults[key];
                 }
             }
@@ -242,46 +216,7 @@ function factory(api, progressApi) {
             throw new CondaError(name + ": exactly one of name or prefix allowed");
         }
 
-        var data = {};
-        var cmdList = [];
-        if (options.name) {
-            data.name = options.name;
-            cmdList.push('--name');
-            cmdList.push(options.name);
-        }
-        if (options.prefix) {
-            data.prefix = options.prefix;
-            cmdList.push('--prefix');
-            cmdList.push(options.prefix);
-        }
-
-        return {
-            options: options,
-            data: data,
-            cmdList: cmdList
-        };
-    };
-
-    var makeFlags = function(options, flags) {
-        // converts a name like useIndexCache to use-index-cache
-        var _convert = function(f) {
-            return f.replace(/([A-Z])/, function(a, b) { return "-" + b.toLocaleLowerCase(); });
-        };
-
-        var cmdList = [];
-        for (var flag in flags) {
-            if (flags.hasOwnProperty(flag)) {
-                if (typeof options[flag] === "undefined") {
-                    options[flag] = flags[flag];
-                }
-
-                if (options[flag]) {
-                    cmdList.push('--' + _convert(flag));
-                }
-            }
-        }
-
-        return cmdList;
+        return options;
     };
 
     var CondaError = (function() {
@@ -308,9 +243,7 @@ function factory(api, progressApi) {
         Env.prototype.linked = function(options) {
             options = defaultOptions(options, { simple: false });
 
-            var cmdList = ['list', '--prefix', this.prefix];
-            var path = ['envs', this.name, 'linked'];
-            return api(cmdList, 'get', path).then(function(fns) {
+            return api('list', { prefix: this.prefix }).then(function(fns) {
                 if (options.simple) {
                     return fns;
                 }
@@ -326,31 +259,32 @@ function factory(api, progressApi) {
         };
 
         Env.prototype.revisions = function() {
-            return api(['list', '--prefix', this.prefix, '--revisions'],
-                       'get', ['envs', this.name, 'revisions']);
+            return api('list', { prefix: this.prefix, revisions: true });
         };
 
-        Env.prototype.install = function(pkg, options) {
-            options = defaultOptions(options, { progress: false });
-            var cmdList = ['install', '--prefix', this.prefix, pkg];
-            var path = ['envs', this.name, 'install', pkg];
-            var data = {};
-            if (!options.progress) {
-                cmdList.push('--quiet');
-                data.quiet = true;
+        Env.prototype.install = function(options) {
+            options = defaultOptions(options, {
+                progress: false,
+                packages: []
+            });
 
-                return api(cmdList, 'post', path, data);
+            if (options.packages.length === 0) {
+                throw new CondaError("Env.install: must specify at least one package");
             }
-            else {
-                return progressApi(cmdList, path, data);
-            }
+
+            var packages = options.packages;
+            delete options.packages;
+
+            options.quiet = !options.progress;
+            delete options.progress;
+            options.prefix = this.prefix;
+
+            return api('install', options, packages);
         };
 
         Env.prototype.update = function(options) {
             options = defaultOptions(options, {
-                packages: []
-            });
-            cmdList = makeFlags(options, {
+                packages: [],
                 dryRun: false,
                 unknown: false,
                 noDeps: false,
@@ -364,48 +298,42 @@ function factory(api, progressApi) {
                 throw new CondaError("Env.update: must specify packages to update or all");
             }
 
-            var cmdList = ['update', '--prefix', this.prefix]
-                .concat(cmdList)
-                .concat(options.packages);
+            var packages = options.packages;
+            delete options.packages;
 
-            return api(cmdList, 'post', ['envs', this.name, 'update'], options);
+            options.prefix = this.prefix;
+
+            return api('update', options, packages);
         };
 
         Env.prototype.remove = function(pkg) {
-            return api(['remove', '--prefix', this.prefix, pkg],
-                       'post', ['envs', this.name, 'install', pkg]);
+            return api('remove', { prefix: this.prefix }, [pkg]);
         };
 
         Env.prototype.clone = function(options) {
-            var result = nameOrPrefixOptions("Env.clone", options, {});
-            options = result.options;
+            var options = nameOrPrefixOptions("Env.clone", options, {});
+            options.clone = this.prefix;
 
-            var data = options.data;
-            var cmdList = ['create', '--clone', this.prefix];
-            cmdList = cmdList.concat(options.cmdList);
-
-            return api(cmdList, 'post', ['env', this.prefix, 'clone'], data);
+            return api('create', options);
         };
 
         Env.prototype.removeEnv = function() {
-            return progressApi(['remove', '--all', '--prefix', this.prefix],
-                               ['envs', this.name, 'delete'], {});
+            return api('remove', { all: true, prefix: this.prefix });
         };
 
         Env.create = function(options) {
-            var result = nameOrPrefixOptions("Env.create", options, {
+            var options = nameOrPrefixOptions("Env.create", options, {
                 packages: []
             });
-            options = result.options;
 
-            if (options.packages.length === 0) {
+            var packages = options.packages;
+            delete options.packages;
+
+            if (packages.length === 0) {
                 throw new CondaError("Env.create: at least one package required");
             }
 
-            var data = options.data;
-            var cmdList = ['create'];
-            cmdList = cmdList.concat(options.cmdList);
-            cmdList = cmdList.concat(options.packages);
+            return api('create', options, packages);
         };
 
         Env.getEnvs = function() {
@@ -437,7 +365,7 @@ function factory(api, progressApi) {
         }
 
         Package.load = function(fn) {
-            return api(['info', fn + '.tar.bz2'], 'get', ['info', fn + '.tar.bz2']).then(function(info) {
+            return api('info', {}, fn + '.tar.bz2').then(function(info) {
                 info = info[fn + '.tar.bz2'];
                 var pkg = new Package(fn, info);
                 return pkg;
@@ -448,14 +376,14 @@ function factory(api, progressApi) {
     })();
 
     var Config = (function() {
-        var _warn_result = function(result) {
+        var __warn_result = function(result) {
             if (result.warnings && result.warnings.length) {
                 console.log("Warnings for conda config:");
                 console.log(result.warnings);
             }
             return result;
         };
-        var _merge = function(dest, src) {
+        var __merge = function(dest, src) {
             for (var key in src) {
                 if (src.hasOwnProperty(key)) {
                     dest[key] = src[key];
@@ -469,6 +397,18 @@ function factory(api, progressApi) {
             'use_pip', 'binstar_upload', 'binstar_personal', 'show_channel_urls',
             'allow_other_channels', 'ssl_verify'];
 
+        var __check_keys = function(f) {
+            return function() {
+                var key = arguments[0];
+                if (ALLOWED_KEYS.indexOf(key) === -1) {
+                    throw new CondaError(
+                        "Config.get: key " + key + " not allowed. Key must be one of "
+                            + ALLOWED_KEYS.join(', '));
+                }
+                return f.apply(f, Array.prototype.slice.call(arguments));
+            };
+        };
+
         function Config(options) {
             options = defaultOptions(options, {
                 system: false,
@@ -476,45 +416,30 @@ function factory(api, progressApi) {
             });
             this.system = options.system;
             this.file = options.file;
-            this.data = {};
-            this.cmdList = ['config'];
+            this.options = {};
 
             if (options.system && options.file !== null) {
                 throw new CondaError("Config: at most one of system, file allowed");
             }
 
             if (options.system) {
-                this.cmdList.push('--system');
-                this.data.system = true;
+                this.options.system = true;
             }
             else if (options.file !== null) {
-                this.cmdList.push('--file');
-                this.cmdList.push(options.file);
-                this.data.file = options.file;
+                this.options.file = options.file;
             }
         }
 
         Config.prototype.rcPath = function() {
-            var call = api(this.cmdList.concat(['--get']),
-                           'get', ['config', 'getAll'], this.data);
+            var call = api('config', __merge({ get: true }, this.options));
             return call.then(function(result) {
                 return result.rc_path;
             });
         };
 
-        Config.prototype.get = function(key) {
-            if (ALLOWED_KEYS.indexOf(key) === -1) {
-                throw new CondaError(
-                    "Config.get: key " + key + " not allowed. Key must be one of "
-                        + ALLOWED_KEYS.join(', '));
-            }
-            var call = api(this.cmdList.concat(['--get', key]),
-                           'get', ['config', 'getAll', key], this.data);
-            return call.then(function(result) {
-                if (result.warnings.length) {
-                    console.log("Warnings for conda config:");
-                    console.log(result.warnings);
-                }
+        Config.prototype.get = __check_keys(function(key) {
+            var call = api('config', __merge({ get: key }, this.options));
+            return call.then(__warn_result).then(function(result) {
                 if (typeof result.get[key] !== "undefined") {
                     return {
                         value: result.get[key],
@@ -528,65 +453,41 @@ function factory(api, progressApi) {
                     };
                 }
             });
-        };
+        });
 
         Config.prototype.getAll = function() {
-            var call = api(this.cmdList.concat(['--get']),
-                           'get', ['config', 'getAll'], this.data);
+            var call = api('config', __merge({ get: true }, this.options));
             return call.then(function(result) {
                 return result.get;
             });
         };
 
         // TODO disallow non iterable keys
-        Config.prototype.add = function(key, value) {
-            if (ALLOWED_KEYS.indexOf(key) === -1) {
-                throw new CondaError(
-                    "Config.set: key " + key + " not allowed. Key must be one of "
-                        + ALLOWED_KEYS.join(', '));
-            }
-            // TODO use PUT? (should be idempotent)
-            var call = api(this.cmdList.concat(['--add', key, value, '--force']),
-                           'post', ['config', 'add', key],
-                           _merge({ value: value }, this.data));
+        Config.prototype.add = __check_keys(function(key, value) {
+            var call = api('config', __merge({ add: [key, value], force: true }, this.options));
             return call.then(_warn_result);
-        };
+        });
 
-        Config.prototype.set = function(key, value) {
-            if (ALLOWED_KEYS.indexOf(key) === -1) {
-                throw new CondaError(
-                    "Config.set: key " + key + " not allowed. Key must be one of "
-                        + ALLOWED_KEYS.join(', '));
-            }
-            var call = api(this.cmdList.concat(['--set', key, value, '--force']),
-                           'post', ['config', 'set', key],
-                           _merge({ value: value }, this.data));
+        Config.prototype.set = __check_keys(function(key, value) {
+            var call = api('config', __merge({ set: [key, value], force: true }, this.options));
             return call.then(_warn_result);
-        };
+        });
 
-        Config.prototype.remove = function(key, value) {
-            if (ALLOWED_KEYS.indexOf(key) === -1) {
-                throw new CondaError(
-                    "Config.remove: key " + key + " not allowed. Key must be one of "
-                        + ALLOWED_KEYS.join(', '));
-            }
-            var call = api(this.cmdList.concat(['--remove', key, value, '--force']),
-                           'post', ['config', 'remove', key],
-                           _merge({ value: value }, this.data));
+        Config.prototype.remove = __check_keys(function(key, value) {
+            var call = api('config', __merge({ remove: [key, value], force: true }, this.options));
             return call.then(_warn_result);
-        };
+        });
 
-        Config.prototype.removeKey = function(key) {
-            var call = api(this.cmdList.concat(['--remove-key', key, value, '--force']),
-                           'post', ['config', 'removeKey', key]);
+        Config.prototype.removeKey = __check_keys(function(key) {
+            var call = api('config', __merge({ removeKey: key, force: true }, this.options));
             return call.then(_warn_result);
-        };
+        });
 
         return Config;
     })();
 
     var info = function() {
-        return api(['info'], 'get', ['info']);
+        return api('info');
     };
 
     var search = function(options) {
@@ -594,29 +495,34 @@ function factory(api, progressApi) {
             regex: null,
             spec: null
         });
-        var cmdList = ['search'];
 
         if (options.regex && options.spec) {
             throw new CondaError("conda.search: only one of regex and spec allowed");
         }
 
+        var positional = [];
+
         if (options.regex !== null) {
-            cmdList.push(regex);
+            positional.push(regex);
         }
         if (options.spec !== null) {
-            cmdList.push(spec);
-            cmdList.push('--spec');
+            positional.push(spec);
+            options.spec = true;
         }
-        return api(cmdList, 'get', cmdList);
+        else {
+            delete options.spec;
+        }
+        delete options.regex;
+
+        return api('search', options, positional);
     };
 
     var launch = function(command) {
-        return api(['launch', command], 'get', ['launch', command]);
+        return api('launch', {}, [command]);
     };
 
     var clean = function(options) {
-        options = defaultOptions(options, {});
-        var cmdList = makeFlags(options, {
+        options = defaultOptions(options, {
             dryRun: false,
             indexCache: false,
             lock: false,
@@ -624,11 +530,13 @@ function factory(api, progressApi) {
             packages: false
         });
 
-        if (!(indexCache || lock || tarballs || packages)) {
-            throw new CondaError("conda.clean: at least one of indexCache, lock, tarballs, or packages required");
+        if (!(options.indexCache || options.lock ||
+              options.tarballs || options.packages)) {
+            throw new CondaError("conda.clean: at least one of indexCache, " +
+                                 "lock, tarballs, or packages required");
         }
 
-        return api(['clean'].concat(cmdList), 'post', ['clean'], options);
+        return api('clean', options);
     };
 
     return {
@@ -640,7 +548,6 @@ function factory(api, progressApi) {
         Config: Config,
         Env: Env,
         Package: Package,
-        API_ROOT: '/api/',
-        DEV_SERVER: false
+        API_ROOT: '/api/'
     };
 }

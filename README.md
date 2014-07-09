@@ -45,11 +45,5 @@ run
 
     $ node conda.js --server
 
-and visit [http://localhost:8080](http://localhost:8080). Open up the
-JavaScript console:
-
-    > conda.DEV_SERVER = true;
-
-Now any further calls to `conda` methods will send the server the `conda`
-command to run, enabling all of them to work without an actual server
-implementation.
+and visit [http://localhost:8000](http://localhost:8000). Open the
+JavaScript console and begin using `conda-js`.
