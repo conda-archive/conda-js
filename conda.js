@@ -254,6 +254,8 @@ else {
 }
 
 function factory(api) {
+    "use strict";
+
     var defaultOptions = function(options, defaults) {
         if (typeof options === "undefined" || options === null) {
             return defaults;
