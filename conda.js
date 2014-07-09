@@ -1,3 +1,17 @@
+var __makeProgressPromise = function(promise) {
+    var callbacks = [];
+
+    promise.onProgress = function(f) {
+        callbacks.push(f);
+    };
+
+    promise.progress = function(data) {
+        callbacks.forEach(function(f) { f(data); });
+    };
+
+    return promise;
+};
+
 // Set up module to run in browser and in Node.js
 // Based loosely on https://github.com/umdjs/umd/blob/master/nodeAdapter.js
 if ((typeof module === 'object' && typeof define !== 'function') || (window && window.atomRequire)) {
@@ -15,72 +29,98 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
         return "--" + f.replace(/([A-Z])/, function(a, b) { return "-" + b.toLocaleLowerCase(); });
     };
 
-    var api = function(command, flags, positional) {
+    var __parse = function(command, flags, positional) {
         if (typeof flags === "undefined") { flags = {}; }
         if (typeof positional === "undefined") { positional = []; }
 
-        return new Promise(function(fulfill, reject) {
-            var cmdList = [command];
+        var cmdList = [command];
 
-            for (var key in flags) {
-                if (flags.hasOwnProperty(key)) {
-                    var value = flags[key];
-                    if (value !== false) {
-                        cmdList.push(__convert(key));
+        for (var key in flags) {
+            if (flags.hasOwnProperty(key)) {
+                var value = flags[key];
+                if (value !== false) {
+                    cmdList.push(__convert(key));
 
-                        if (Array.isArray(value)) {
-                            cmdList = cmdList.concat(value);
-                        }
-                        else if (value !== true) {
-                            cmdList.push(value);
-                        }
+                    if (Array.isArray(value)) {
+                        cmdList = cmdList.concat(value);
+                    }
+                    else if (value !== true) {
+                        cmdList.push(value);
                     }
                 }
             }
+        }
 
-            cmdList = cmdList.concat(positional);
-            cmdList.push('--json');
+        cmdList = cmdList.concat(positional);
+        cmdList.push('--json');
 
+        return cmdList;
+    }
+
+    var __spawn = function(cmdList) {
+        var conda = ChildProcess.spawn('conda', cmdList, {});
+        conda.stdout.setEncoding('utf8');
+        return conda;
+    };
+
+    var api = function(command, flags, positional) {
+        var cmdList = __parse(command, flags, positional);
+        var promise = new Promise(function(fulfill, reject) {
             try {
-                var conda = ChildProcess.spawn('conda', cmdList, {});
-                var buffer = [];
-                conda.stdout.setEncoding('utf8');
-                conda.stdout.on('data', function(data) {
-                    buffer.push(data);
-                });
-                conda.on('close', function() {
-                    try {
-                        fulfill(JSON.parse(buffer.join('')));
-                    }
-                    catch (ex) {
-                        reject({
-                            'exception': ex,
-                            'result': buffer.join('')
-                        });
-                    }
-                });
+                var conda = __spawn(cmdList);
             }
             catch (ex) {
                 reject({
                     'exception': ex
-                })
+                });
+                return;
             }
+
+            var buffer = [];
+            conda.stdout.on('data', function(data) {
+                buffer.push(data);
+            });
+
+            conda.on('close', function() {
+                try {
+                    fulfill(JSON.parse(buffer.join('')));
+                }
+                catch (ex) {
+                    reject({
+                        'exception': ex,
+                        'result': buffer.join('')
+                    });
+                }
+            });
         });
+        return promise;
     };
 
     // Returns Promise like api(), but this object has additional callbacks
     // for progress bars. Retrieves data via ChildProcess.
-    var progressApi = function(cmdList, url, data) {
-        var callbacks = [];
-        var progressing = true;
-        var params = cmdList.concat(['--json']);
-        var conda = ChildProcess.spawn('conda', params, {});
-        var buffer = [];
+    var progressApi = function(command, flags, positional) {
+        var cmdList = __parse(command, flags, positional);
         var promise = new Promise(function(fulfill, reject) {
+            try {
+                var conda = __spawn(cmdList);
+            }
+            catch (ex) {
+                reject({
+                    'exception': ex
+                });
+                return;
+            }
+
+            var progressing = true;
+            var buffer = [];
             conda.stdout.on('data', function(data) {
-                var rest = data.toString();
+                var rest = data;
                 if (rest.indexOf('\0') == -1) {
                     progressing = false;
+                }
+                else {
+                    // Handles multiple progress bars (e.g. fetch then install)
+                    progressing = true;
                 }
 
                 if (!progressing) {
@@ -101,6 +141,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
                     }
                 }
             });
+
             conda.on('close', function() {
                 try {
                     fulfill(JSON.parse(buffer.join('')));
@@ -113,31 +154,16 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
                 }
             });
         });
-        promise.onProgress = function(f) {
-            callbacks.push(f);
-        };
-        promise.progress = function(data) {
-            for (var i = 0; i < callbacks.length; i++) {
-                callbacks[i](data);
-            }
-        };
-        return promise;
+        return __makeProgressPromise(promise);
     };
 
     module.exports = factory(api, progressApi);
     module.exports.api = api;
+    module.exports.progressApi = progressApi;
 }
 else {
     // We are in the browser
-
-    var api = function(command, flags, positional) {
-        // URL structure: /api/command
-        // Flags are GET query string or POST body
-        // Positional is in query string or POST body
-
-        // Translation of JS flag camelCase to command line flag
-        // dashed-version occurs server-side
-
+    var __parse = function(flags, positional) {
         if (typeof flags === "undefined") {
             flags = {};
         }
@@ -147,6 +173,19 @@ else {
 
         var data = flags;
         data.positional = positional;
+
+        return data;
+    }
+
+    var api = function(command, flags, positional) {
+        // URL structure: /api/command
+        // Flags are GET query string or POST body
+        // Positional is in query string or POST body
+
+        // Translation of JS flag camelCase to command line flag
+        // dashed-version occurs server-side
+
+        var data = __parse(flags, positional);
 
         return Promise.resolve($.ajax({
             data: data,
@@ -158,31 +197,32 @@ else {
 
     // Returns Promise like api(), but this object has additional callbacks
     // for progress bars. Retrieves data via websocket.
-    var progressApi = function(cmdList, url, data) {
-        var callbacks = [];
+    var progressApi = function(command, flags, positional) {
         var promise = new Promise(function(fulfill, reject) {
-            var path = parse(cmdList, url, data);
+            var data = __parse(flags, positional);
+            positional = data.positional;
+            delete data.positional;
+
             var socket = io();
-            socket.emit('api', path);
+            socket.emit('api', {
+                subcommand: command,
+                flags: data,
+                positional: positional
+            });
+
             socket.on('progress', function(progress) {
                 console.log(progress);
                 promise.onProgress(progress);
             });
+
             socket.on('result', function(result) {
                 console.log(result);
                 socket.disconnect();
                 fulfill(result);
             });
         });
-        promise.onProgress = function(f) {
-            callbacks.push(f);
-        };
-        promise.progress = function(data) {
-            for (var i = 0; i < callbacks.length; i++) {
-                callbacks[i](data);
-            }
-        };
-        return promise;
+
+        return __makeProgressPromise(promise);
     };
 
     window.conda = factory(api, progressApi);
@@ -247,6 +287,10 @@ function factory(api, progressApi) {
                 if (options.simple) {
                     return fns;
                 }
+
+                // TODO this is extremely slow (x20 slowdown). Load this
+                // from conda.search() instead? (will that pull all the
+                // data?)
                 var promises = [];
                 for (var i = 0; i < fns.length; i++) {
                     promises.push(Package.load(fns[i]));
@@ -279,7 +323,13 @@ function factory(api, progressApi) {
             delete options.progress;
             options.prefix = this.prefix;
 
-            return api('install', options, packages);
+            // TODO automatically choose API call based on quiet flag?
+            if (options.quiet) {
+                return api('install', options, packages);
+            }
+            else {
+                return progressApi('install', options, packages);
+            }
         };
 
         Env.prototype.update = function(options) {
@@ -307,7 +357,7 @@ function factory(api, progressApi) {
         };
 
         Env.prototype.remove = function(pkg) {
-            return api('remove', { prefix: this.prefix }, [pkg]);
+            return api('remove', { prefix: this.prefix, quiet: true }, [pkg]);
         };
 
         Env.prototype.clone = function(options) {
