@@ -497,10 +497,16 @@ function factory(api) {
 
     var Package = (function() {
         var _cache = {};
+        var _search_cache = {};
+        var _search_cache_promise = null;
 
         function Package(fn, info) {
             _cache[fn] = this;
             this.fn = fn;
+            this.name = info.name;
+            this.build = info.build;
+            this.dist = this.fn;
+            this.version = info.version;
             this.info = info;
         }
 
@@ -510,15 +516,54 @@ function factory(api) {
             }.bind(this));
         };
 
+        Package.splitFn = function(fn) {
+            var parts = fn.split('-');
+            return {
+                name: parts.slice(0, -2).join('-'),
+                build: parts[parts.length - 1],
+                version: parts[parts.length - 2]
+            };
+        };
+
         Package.load = function(fn, reload) {
+            // This can get quite expensive. To deal with that:
+            // 1. Cache Package objects.
+            // 2. Load data from `conda search`'s index.
+            // 3. Cache that index.
+            // 4. Fall back on `conda info` only if package is not in index
+            // (when the package was built/installed locally, for instance)
+            if (_search_cache_promise === null) {
+                _search_cache_promise = search().then(function(result) {
+                    _search_cache = result;
+                });
+            }
             if (typeof reload === "undefined") {
                 reload = false;
             }
 
             if (!_cache.hasOwnProperty(fn) || reload) {
-                return api('info', {}, fn + '.tar.bz2').then(function(info) {
-                    info = info[fn + '.tar.bz2'];
+                return _search_cache_promise.then(function(search) {
+                    var spec = Package.splitFn(fn);
+                    var packages = _search_cache[spec.name];
+                    if (typeof packages === "undefined") {
+                        return api('info', {}, fn + '.tar.bz2').then(function(info) {
+                            info = info[fn + '.tar.bz2'];
+                            var pkg = new Package(fn, info);
+                            return pkg;
+                        });
+                    }
+
+                    var pkgInfo;
+                    for (var i = 0; i < packages.length; i++) {
+                        var info = packages[i];
+                        if (info.build === spec.build && info.version === spec.version) {
+                            pkgInfo = info;
+                            break;
+                        }
+                    }
+
                     var pkg = new Package(fn, info);
+                    _cache[fn] = pkg;
                     return pkg;
                 });
             }
