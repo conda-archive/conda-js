@@ -15,8 +15,14 @@ app.get('/', function(req, res) {
 app.get('/conda.js', function(req, res) {
     res.sendfile(__dirname + '/conda.js');
 });
-app.get('/test.js', function(req, res) {
-    res.sendfile(__dirname + '/test.js');
+app.get('/test.browser.js', function(req, res) {
+    res.sendfile(__dirname + '/test.browser.js');
+});
+app.get('/mocha.js', function(req, res) {
+    res.sendfile(__dirname + '/node_modules/mocha/mocha.js');
+});
+app.get('/mocha.css', function(req, res) {
+    res.sendfile(__dirname + '/node_modules/mocha/mocha.css');
 });
 
 var __handle = function(subcommand, flags) {

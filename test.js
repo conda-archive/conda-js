@@ -1,5 +1,13 @@
 var assert = require('assert');
-var conda = require('./conda');
+
+var conda;
+if (typeof window !== "undefined") {
+    conda = window.conda;
+    mocha.timeout(10000).slow(2000);
+}
+else {
+    conda = require('./conda');
+}
 
 function assertSuccess(result) {
     assert.ok((typeof result.success !== "undefined") && result.success);

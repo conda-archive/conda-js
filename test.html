@@ -1,8 +1,21 @@
 <html>
-  <head>
-    <script src="https://www.promisejs.org/polyfills/promise-4.0.0.js"></script>
-    <script src="http://code.jquery.com/jquery-2.1.1.min.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="conda.js"></script>
-  </head>
+<head>
+  <meta charset="utf-8">
+  <title>Mocha Tests</title>
+  <script src="https://www.promisejs.org/polyfills/promise-4.0.0.js"></script>
+  <script src="http://code.jquery.com/jquery-2.1.1.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="mocha.css" />
+</head>
+<body>
+  <div id="mocha"></div>
+  <script src="mocha.js"></script>
+  <script>mocha.setup('bdd')</script>
+  <script src="conda.js"></script>
+  <script src="test.browser.js"></script>
+  <script>
+    mocha.globals(['$', 'conda']);
+    mocha.run();
+  </script>
+</body>
 </html>

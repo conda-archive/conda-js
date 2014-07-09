@@ -10,5 +10,9 @@
     "body-parser": "^1.4.3",
     "express": "^4.5.1",
     "mocha": "^1.20.1"
+  },
+  "scripts": {
+    "pretest": "node_modules/.bin/browserify test.js > test.browser.js",
+    "test": "node_modules/.bin/mocha -t 10s --reporter spec --slow 2s"
   }
 }
