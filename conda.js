@@ -465,22 +465,22 @@ function factory(api, progressApi) {
         // TODO disallow non iterable keys
         Config.prototype.add = __check_keys(function(key, value) {
             var call = api('config', __merge({ add: [key, value], force: true }, this.options));
-            return call.then(_warn_result);
+            return call.then(__warn_result);
         });
 
         Config.prototype.set = __check_keys(function(key, value) {
             var call = api('config', __merge({ set: [key, value], force: true }, this.options));
-            return call.then(_warn_result);
+            return call.then(__warn_result);
         });
 
         Config.prototype.remove = __check_keys(function(key, value) {
             var call = api('config', __merge({ remove: [key, value], force: true }, this.options));
-            return call.then(_warn_result);
+            return call.then(__warn_result);
         });
 
         Config.prototype.removeKey = __check_keys(function(key) {
             var call = api('config', __merge({ removeKey: key, force: true }, this.options));
-            return call.then(_warn_result);
+            return call.then(__warn_result);
         });
 
         return Config;
