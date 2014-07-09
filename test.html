@@ -6,8 +6,14 @@
   <script src="http://code.jquery.com/jquery-2.1.1.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <link rel="stylesheet" href="mocha.css" />
+  <style>
+    body > h1 {
+     font: 32px sans-serif;
+    }
+  </style>
 </head>
 <body>
+  <h1>conda-js: Mocha test suite</h1>
   <div id="mocha"></div>
   <script src="mocha.js"></script>
   <script>mocha.setup('bdd')</script>

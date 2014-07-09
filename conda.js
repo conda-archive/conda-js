@@ -459,21 +459,49 @@ function factory(api) {
                 return envs;
             });
         };
+
+        Env.getRoot = function() {
+            return info().then(function(info) {
+                var root = new Env('root', info.default_prefix);
+                root.isDefault = true;
+                root.isRoot = true;
+
+                return root;
+            });
+        };
         return Env;
     })();
 
     var Package = (function() {
+        var _cache = {};
+
         function Package(fn, info) {
+            _cache[fn] = this;
             this.fn = fn;
             this.info = info;
         }
 
-        Package.load = function(fn) {
-            return api('info', {}, fn + '.tar.bz2').then(function(info) {
-                info = info[fn + '.tar.bz2'];
-                var pkg = new Package(fn, info);
-                return pkg;
-            });
+        Package.prototype.reload = function() {
+            return Package.load(this.fn).then(function(pkg) {
+                this.info = pkg.info;
+            }.bind(this));
+        };
+
+        Package.load = function(fn, reload) {
+            if (typeof reload === "undefined") {
+                reload = false;
+            }
+
+            if (!_cache.hasOwnProperty(fn) || reload) {
+                return api('info', {}, fn + '.tar.bz2').then(function(info) {
+                    info = info[fn + '.tar.bz2'];
+                    var pkg = new Package(fn, info);
+                    return pkg;
+                });
+            }
+            else {
+                return Promise.resolve(_cache[fn]);
+            }
         };
 
         return Package;
