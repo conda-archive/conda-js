@@ -187,10 +187,23 @@ else {
 
         var data = __parse(flags, positional);
 
+        var method = 'post';
+        if (['info', 'list', 'search'].indexOf(command) !== -1 ||
+            command === 'config' && flags.get) {
+            method = 'get';
+        }
+
+        var contentType = '';
+        if (method === 'post') {
+            contentType = 'application/json';
+            data = JSON.stringify(data);
+        }
+
         return Promise.resolve($.ajax({
+            contentType: contentType,
             data: data,
             dataType: 'json',
-            type: 'get',
+            type: method,
             url: window.conda.API_ROOT + command
         }));
     };
