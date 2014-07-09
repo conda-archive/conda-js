@@ -303,8 +303,11 @@ function factory(api) {
             this.name = name;
             this.prefix = prefix;
 
-            this.isDefault = false;
-            this.isRoot = false;
+            this.is_default = false;
+            this.is_root = false;
+
+            this.installed = {};
+            this.history = [];
         }
 
         Env.prototype.linked = function(options) {
@@ -315,22 +318,24 @@ function factory(api) {
                     return fns;
                 }
 
-                // TODO this is extremely slow (x20 slowdown). Load this
-                // from conda.search() instead? (will that pull all the
-                // data?)
                 var promises = [];
                 for (var i = 0; i < fns.length; i++) {
                     promises.push(Package.load(fns[i]));
                 }
-
                 return Promise.all(promises).then(function(pkgs) {
-                    return pkgs;
-                });
-            });
+                    pkgs.forEach(function(pkg) {
+                        this.installed[pkg.name] = pkg;
+                    }.bind(this));
+                }.bind(this));
+            }.bind(this));
         };
 
         Env.prototype.revisions = function() {
-            return api('list', { prefix: this.prefix, revisions: true });
+            return api('list', { prefix: this.prefix, revisions: true })
+                .then(function(revisions) {
+                    this.history = revisions;
+                    return revisions;
+                }.bind(this));
         };
 
         Env.prototype.install = function(options) {
