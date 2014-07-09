@@ -1,11 +1,12 @@
 var __makeProgressPromise = function(promise) {
     var callbacks = [];
 
-    promise.onProgress = function(f) {
+    promise.progress = function(f) {
         callbacks.push(f);
+        return this;
     };
 
-    promise.progress = function(data) {
+    promise.onProgress = function(data) {
         callbacks.forEach(function(f) { f(data); });
     };
 
@@ -38,7 +39,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
         for (var key in flags) {
             if (flags.hasOwnProperty(key)) {
                 var value = flags[key];
-                if (value !== false) {
+                if (value !== false && value !== null) {
                     cmdList.push(__convert(key));
 
                     if (Array.isArray(value)) {
@@ -66,7 +67,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
     var api = function(command, flags, positional) {
         var cmdList = __parse(command, flags, positional);
 
-        if (flags && flags.quiet && flags.quiet === false) {
+        if (flags && typeof flags.quiet !== "undefined" && flags.quiet === false) {
             // Handle progress bars
             return progressApi(command, flags, positional);
         }
@@ -140,7 +141,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
                     buffer.push(first);
                     var json = JSON.parse(buffer.join(''));
                     buffer = [];
-                    promise.progress(json);
+                    promise.onProgress(json);
 
                     if (json.finished === true) {
                         progressing = false;
@@ -193,7 +194,7 @@ else {
 
         var data = __parse(flags, positional);
 
-        if (flags && flags.quiet && flags.quiet === false) {
+        if (flags && typeof flags.quiet !== "undefined" && flags.quiet === false) {
             // Handle progress bars
             return progressApi(command, flags, positional);
         }
@@ -427,14 +428,14 @@ function factory(api) {
                 packages: []
             });
 
+            if (options.packages.length === 0) {
+                throw new CondaError("Env.create: at least one package required");
+            }
+
             var packages = options.packages;
             delete options.packages;
             options.quiet = !options.progress;
             delete options.progress;
-
-            if (packages.length === 0) {
-                throw new CondaError("Env.create: at least one package required");
-            }
 
             return api('create', options, packages);
         };

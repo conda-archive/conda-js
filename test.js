@@ -141,13 +141,23 @@ describe('Env', function() {
         });
     });
 
-    // TODO this and removeEnv below are extremely slow, time out
-    // describe('.create', function() {
-    //     it('should return a dictionary', function(done) {
-    //         conda.Env.create({ name: 'testing', packages: ['_license'] })
-    //             .then(assertType('object')).then(done);
-    //     });
-    // });
+    describe('.create', function() {
+        it('should support progressbars', function(done) {
+            var first = true;
+            conda.Env.create({ name: 'testing', packages: ['_license'], progress: true })
+                .progress(function(progress) {
+                    if (first) {
+                        done();
+                        first = false;
+                    }
+                }).done(function() {
+                    // happens when env was created beforehand
+                    if (first) {
+                        done();
+                    }
+                });
+        });
+    });
 
     describe('.getEnvs', function() {
         it('should return a list of Envs', function() {
@@ -187,6 +197,7 @@ describe('Env', function() {
         });
     });
 
+    // TODO this is extremely slow, times out
     // describe('#removeEnv', function() {
     //     it('should return a dictionary', function(done) {
     //         envs.forEach(function(env) {
