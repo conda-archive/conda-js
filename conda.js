@@ -414,7 +414,15 @@ function factory(api) {
             options.quiet = !options.progress;
             delete options.progress;
 
-            return api('create', options);
+            return api('create', options).then(function(data) {
+                if (typeof data.success !== "undefined" && data.success) {
+                    data.env = new Env(options.name, data.actions.PREFIX);
+                    return data;
+                }
+                else {
+                    this.reject(data);
+                }
+            });
         };
 
         Env.prototype.removeEnv = function(options) {
@@ -444,7 +452,15 @@ function factory(api) {
             options.quiet = !options.progress;
             delete options.progress;
 
-            return api('create', options, packages);
+            return api('create', options, packages).then(function(data) {
+                if (typeof data.success !== "undefined" && data.success) {
+                    data.env = new Env(options.name, data.actions.PREFIX);
+                    return data;
+                }
+                else {
+                    this.reject(data);
+                }
+            });
         };
 
         Env.getEnvs = function() {
@@ -460,8 +476,8 @@ function factory(api) {
                 }
 
                 envs.forEach(function(env) {
-                    env.isDefault = env.prefix == info.default_prefix;
-                    env.isRoot = env.prefix == info.root_prefix;
+                    env.is_default = env.prefix == info.default_prefix;
+                    env.is_root = env.prefix == info.root_prefix;
                 });
                 return envs;
             });
