@@ -65,6 +65,12 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
 
     var api = function(command, flags, positional) {
         var cmdList = __parse(command, flags, positional);
+
+        if (flags && flags.quiet && flags.quiet === false) {
+            // Handle progress bars
+            return progressApi(command, flags, positional);
+        }
+
         var promise = new Promise(function(fulfill, reject) {
             try {
                 var conda = __spawn(cmdList);
@@ -157,7 +163,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
         return __makeProgressPromise(promise);
     };
 
-    module.exports = factory(api, progressApi);
+    module.exports = factory(api);
     module.exports.api = api;
     module.exports.progressApi = progressApi;
 }
@@ -186,6 +192,11 @@ else {
         // dashed-version occurs server-side
 
         var data = __parse(flags, positional);
+
+        if (flags && flags.quiet && flags.quiet === false) {
+            // Handle progress bars
+            return progressApi(command, flags, positional);
+        }
 
         var method = 'post';
         if (['info', 'list', 'search'].indexOf(command) !== -1 ||
@@ -238,10 +249,10 @@ else {
         return __makeProgressPromise(promise);
     };
 
-    window.conda = factory(api, progressApi);
+    window.conda = factory(api);
 }
 
-function factory(api, progressApi) {
+function factory(api) {
     var defaultOptions = function(options, defaults) {
         if (typeof options === "undefined" || options === null) {
             return defaults;
@@ -336,13 +347,7 @@ function factory(api, progressApi) {
             delete options.progress;
             options.prefix = this.prefix;
 
-            // TODO automatically choose API call based on quiet flag?
-            if (options.quiet) {
-                return api('install', options, packages);
-            }
-            else {
-                return progressApi('install', options, packages);
-            }
+            return api('install', options, packages);
         };
 
         Env.prototype.update = function(options) {
@@ -354,7 +359,8 @@ function factory(api, progressApi) {
                 useIndexCache: false,
                 useLocal: false,
                 noPin: false,
-                all: false
+                all: false,
+                progress: false
             });
 
             if (options.packages.length === 0 && !options.all) {
@@ -364,33 +370,67 @@ function factory(api, progressApi) {
             var packages = options.packages;
             delete options.packages;
 
+            options.quiet = !options.progress;
+            delete options.progress;
             options.prefix = this.prefix;
 
             return api('update', options, packages);
         };
 
-        Env.prototype.remove = function(pkg) {
-            return api('remove', { prefix: this.prefix, quiet: true }, [pkg]);
+        Env.prototype.remove = function(options) {
+            options = defaultOptions(options, {
+                progress: false,
+                packages: []
+            });
+
+            if (options.packages.length === 0) {
+                throw new CondaError("Env.remove: must specify at least one package");
+            }
+
+            var packages = options.packages;
+            delete options.packages;
+
+            options.quiet = !options.progress;
+            delete options.progress;
+            options.prefix = this.prefix;
+
+            return api('remove', options, packages);
         };
 
         Env.prototype.clone = function(options) {
-            var options = nameOrPrefixOptions("Env.clone", options, {});
+            var options = nameOrPrefixOptions("Env.clone", options, {
+                progress: false
+            });
+
             options.clone = this.prefix;
+            options.quiet = !options.progress;
+            delete options.progress;
 
             return api('create', options);
         };
 
-        Env.prototype.removeEnv = function() {
-            return api('remove', { all: true, prefix: this.prefix });
+        Env.prototype.removeEnv = function(options) {
+            options = defaultOptions(options, {
+                progress: false
+            });
+
+            return api('remove', {
+                all: true,
+                prefix: this.prefix,
+                quiet: !options.progress
+            });
         };
 
         Env.create = function(options) {
             var options = nameOrPrefixOptions("Env.create", options, {
+                progress: false,
                 packages: []
             });
 
             var packages = options.packages;
             delete options.packages;
+            options.quiet = !options.progress;
+            delete options.progress;
 
             if (packages.length === 0) {
                 throw new CondaError("Env.create: at least one package required");
