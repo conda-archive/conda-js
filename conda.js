@@ -15,11 +15,11 @@ var __makeProgressPromise = function(promise) {
 
 // Set up module to run in browser and in Node.js
 // Based loosely on https://github.com/umdjs/umd/blob/master/nodeAdapter.js
-if ((typeof module === 'object' && typeof define !== 'function') || (window && window.atomRequire)) {
+if ((typeof module === 'object' && typeof define !== 'function') || (window && window.nodeRequire)) {
     // We are in Node.js or atom
 
-    if (typeof window !== "undefined" && window.atomRequire) {
-        var require = window.atomRequire;
+    if (typeof window !== "undefined" && window.nodeRequire) {
+        var require = window.nodeRequire;
     }
 
     var ChildProcess = require('child_process');
@@ -326,6 +326,7 @@ function factory(api) {
                     pkgs.forEach(function(pkg) {
                         this.installed[pkg.name] = pkg;
                     }.bind(this));
+                    return pkgs;
                 }.bind(this));
             }.bind(this));
         };
@@ -452,7 +453,8 @@ function factory(api) {
             options.quiet = !options.progress;
             delete options.progress;
 
-            return api('create', options, packages).then(function(data) {
+            var progress = api('create', options, packages);
+            var promise = progress.then(function(data) {
                 if (typeof data.success !== "undefined" && data.success) {
                     data.env = new Env(options.name, data.actions.PREFIX);
                     return data;
@@ -461,6 +463,9 @@ function factory(api) {
                     this.reject(data);
                 }
             });
+            // TODO formalize/automate this - preserves progress API
+            promise.progress = progress.progress.bind(progress);
+            return promise;
         };
 
         Env.getEnvs = function() {

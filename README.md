@@ -29,14 +29,15 @@ The library is structured asynchronously. Under Node.js `conda-js` calls
 Conda as a subprocess with the `--json` option. In the browser, `conda-js`
 makes a request to the server, which should use the subprocess as well.
 
-### Usage under Atom Shell
+### Usage under Atom Shell/node-webkit
 
-`conda-js` can be used as a Node library under Atom Shell. The procedure is
-the same as for Node.js from the renderer side. From the client side, the
-library expects `window.atomRequire` to be the `require` function (the
-reason being that some client side libraries redefine `require`); also, it
-should be required using `atomRequire('conda')` and not through the `remote`
-library (its IPC is incomplete and will break the library).
+`conda-js` can be used as a Node library under Atom Shell and
+node-webkit. The procedure is the same as for Node.js from the renderer
+side. From the client side, the library expects `window.nodeRequire` to be
+the `require` function (the reason being that some client side libraries
+redefine `require`). Under Atom Shell, it should be required using
+`nodeRequire('conda')` and not through the `remote` library (its IPC is
+incomplete and will break the library).
 
 ## Development Server
 
