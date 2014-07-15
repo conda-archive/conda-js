@@ -426,6 +426,27 @@ function factory(api) {
             });
         };
 
+        Env.prototype.launch = function(options) {
+            var options = defaultOptions(options, {
+                name: null,
+                pkg: null
+            });
+
+            if (!(options.name || options.pkg)) {
+                throw new CondaError("Env.launch: either name or pkg needed");
+            }
+            if (options.name && options.pkg) {
+                throw new CondaError("Env.launch: exactly one of name or pkg allowed");
+            }
+
+            var pkg = options.name;
+            if (options.pkg) {
+                pkg = options.pkg;
+            }
+
+            return api('launch', { prefix: this.prefix }, [pkg]);
+        };
+
         Env.prototype.removeEnv = function(options) {
             options = defaultOptions(options, {
                 progress: false
