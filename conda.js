@@ -518,6 +518,31 @@ function factory(api) {
                 return root;
             });
         };
+
+        /**
+           Sync method for Backbone collections.
+         */
+        Env.backboneSync = function(method, model, options) {
+            switch (method) {
+            case "read":
+                Env.getEnvs().then(function(envs) {
+                    var promises = [];
+                    envs.forEach(function(env) {
+                        promises.push(env.linked());
+                        promises.push(env.revisions());
+                    });
+
+                    Promise.all(promises).then(function() {
+                        options.success(envs);
+                    });
+                });
+                break;
+
+            default:
+                console.log("Env.backboneSync: cannot handle method " + method);
+            }
+        };
+
         return Env;
     })();
 

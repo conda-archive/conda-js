@@ -16,7 +16,7 @@ From the browser, include the Promise polyfill
 
     <script src="https://www.promisejs.org/polyfills/promise-4.0.0.js"></script>
 
-as well as jQuery, and then include `conda.js`.
+as well as jQuery and the SockJS client library, and then include `conda.js`.
 
 
 In your code use Conda like so:
