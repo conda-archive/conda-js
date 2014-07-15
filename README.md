@@ -39,7 +39,7 @@ redefine `require`). Under Atom Shell, it should be required using
 `nodeRequire('conda')` and not through the `remote` library (its IPC is
 incomplete and will break the library).
 
-## Development Server
+## Testing and Development Server
 
 To make the library easier to debug, it comes with its own server. Simply
 run
@@ -47,4 +47,13 @@ run
     $ node devserver.js
 
 and visit [http://localhost:8000](http://localhost:8000). Open the
-JavaScript console and begin using `conda-js`.
+JavaScript console and begin using `conda-js`. If you wish to run tests for
+the AJAX part of the library as well, run
+
+    $ npm run-script pre-test
+
+before starting the dev server.
+
+To test the Node.js part of the library, run
+
+    $ npm run-script test
