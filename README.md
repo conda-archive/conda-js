@@ -44,7 +44,7 @@ incomplete and will break the library).
 To make the library easier to debug, it comes with its own server. Simply
 run
 
-    $ node conda.js --server
+    $ node devserver.js
 
 and visit [http://localhost:8000](http://localhost:8000). Open the
 JavaScript console and begin using `conda-js`.
