@@ -216,7 +216,7 @@ else {
             data: data,
             dataType: 'json',
             type: method,
-            url: window.conda.API_ROOT + command
+            url: window.conda.API_ROOT + "/" + command
         }));
     };
 
@@ -228,23 +228,23 @@ else {
             positional = data.positional;
             delete data.positional;
 
-            var socket = io();
-            socket.emit('api', {
-                subcommand: command,
-                flags: data,
-                positional: positional
-            });
-
-            socket.on('progress', function(progress) {
-                console.log(progress);
-                promise.onProgress(progress);
-            });
-
-            socket.on('result', function(result) {
-                console.log(result);
-                socket.disconnect();
-                fulfill(result);
-            });
+            var socket = new SockJS('http://' + window.location.host + window.conda.API_ROOT + '_ws/');
+            socket.onopen = function() {
+                socket.send(JSON.stringify({
+                    subcommand: command,
+                    flags: data,
+                    positional: positional
+                }));
+            };
+            socket.onmessage = function(e) {
+                var data = JSON.parse(e.data);
+                if (typeof data.progress !== "undefined") {
+                    promise.onProgress(data.progress);
+                }
+                else if (typeof data.finished !== "undefined") {
+                    fulfill(data.finished);
+                }
+            };
         });
 
         return __makeProgressPromise(promise);
@@ -753,6 +753,6 @@ function factory(api) {
         Config: Config,
         Env: Env,
         Package: Package,
-        API_ROOT: '/api/'
+        API_ROOT: '/api'
     };
 }

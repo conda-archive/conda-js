@@ -1,8 +1,8 @@
 var express = require('express');
 var bodyParser = require('body-parser');
+var http = require('http');
 var app = express();
-var http = require('http').Server(app);
-var io = require('socket.io')(http);
+var sockjs = require('sockjs');
 var conda = require('./conda');
 
 process.argv = [];
@@ -46,30 +46,28 @@ app.post('/api/:subcommand', function(req, res) {
     });
 });
 
-io.on('connection', function(socket) {
+var sockjs_server = sockjs.createServer({ sockjs_url: 'http://cdn.sockjs.org/sockjs-0.3.js' });
+
+sockjs_server.on('connection', function(socket) {
     console.log('connected');
-    socket.on('api', function(data) {
+    socket.on('data', function(data) {
+        data = JSON.parse(data);
         var subcommand = data.subcommand;
         var flags = data.flags;
         var positional = data.positional;
 
         console.log('Handling progress', subcommand, flags, positional);
         var progress = conda.progressApi(subcommand, flags, positional);
-        progress.onProgress(function(progress) {
-            socket.emit('progress', progress);
+        progress.progress(function(progress) {
+            socket.write(JSON.stringify({ 'progress': progress }));
         });
         progress.done(function(data) {
-            socket.emit('result', data);
-            socket.disconnect();
+            socket.write(JSON.stringify({ 'progress': data }));
+            socket.close();
         });
     });
-    socket.on('disconnect', function(data) {
-        socket.disconnect();
-    });
 });
 
-io.on('disconnect', function() {
-    console.log('disconnected');
-});
-
-http.listen(8000);
+var server = http.Server(app);
+sockjs_server.installHandlers(server, { prefix: '/api_ws' });
+server.listen(8000);
