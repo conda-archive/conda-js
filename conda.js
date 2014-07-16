@@ -418,6 +418,7 @@ function factory(api) {
                     promises.push(Package.load(fns[i]));
                 }
                 return Promise.all(promises).then(function(pkgs) {
+                    this.installed = {};
                     pkgs.forEach(function(pkg) {
                         this.installed[pkg.name] = pkg;
                     }.bind(this));
@@ -573,14 +574,13 @@ function factory(api) {
             var promise = progress.then(function(data) {
                 if (typeof data.success !== "undefined" && data.success) {
                     data.env = new Env(options.name, data.actions.PREFIX);
-                    return data;
                 }
-                else {
-                    this.reject(data);
-                }
+                return data;
             });
             // TODO formalize/automate this - preserves progress API
-            promise.progress = progress.progress.bind(progress);
+            if (typeof progress.progress !== "undefined") {
+                promise.progress = progress.progress.bind(progress);
+            }
             return promise;
         };
 
@@ -625,11 +625,18 @@ function factory(api) {
                     envs.forEach(function(env) {
                         promises.push(env.linked());
                         promises.push(env.revisions());
+                        env.id = env.prefix ? env.prefix : env.name;
                     });
 
                     Promise.all(promises).then(function() {
                         options.success(envs);
                     });
+                });
+                break;
+
+            case "delete":
+                return model.attributes.removeEnv().then(function(result) {
+                    options.success(result);
                 });
                 break;
 
