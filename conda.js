@@ -27,7 +27,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
 
     // converts a name like useIndexCache to --use-index-cache
     var __convert = function(f) {
-        return "--" + f.replace(/([A-Z])/, function(a, b) { return "-" + b.toLocaleLowerCase(); });
+        return "--" + f.replace(/([A-Z])/g, function(a, b) { return "-" + b.toLocaleLowerCase(); });
     };
 
     var __parse = function(command, flags, positional) {
