@@ -384,6 +384,8 @@ function factory(api) {
             this.message = message;
         }
 
+        CondaError.prototype.__proto__ = new Error;
+
         CondaError.prototype.toString = function() {
             return "CondaError: " + this.message;
         };
