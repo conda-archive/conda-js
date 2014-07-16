@@ -895,6 +895,6 @@ function factory(api) {
         Env: Env,
         Package: Package,
         API_ROOT: '/api',
-        API_METHOD: 'REST'
+        API_METHOD: 'RPC'
     };
 }
