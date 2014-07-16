@@ -184,7 +184,7 @@ else {
         return data;
     }
 
-    var api = function(command, flags, positional) {
+    var rpcApi = function(command, flags, positional) {
         // URL structure: /api/command
         // Flags are GET query string or POST body
         // Positional is in query string or POST body
@@ -218,6 +218,94 @@ else {
             type: method,
             url: window.conda.API_ROOT + "/" + command
         }));
+    };
+
+    var restApi = function(command, flags, positional) {
+        // URL structure is same as RPC API, except commands involving an
+        // environment are structured more RESTfully - additionally, we use
+        // GET/POST/PUT/DELETE based on the subcommand.
+        // Commands involving --name and --prefix are translated to
+        // /api/env/name/<name>/subcommand<? other Argos>
+        var data = __parse(flags, positional);
+        var url = '';
+
+        if (typeof data.name !== "undefined") {
+            url += '/env/name/' + encodeURIComponent(data.name);
+        }
+        else if (typeof data.prefix !== "undefined") {
+            url += '/env/prefix/' + encodeURIComponent(data.prefix);
+        }
+
+        delete data['name'];
+        delete data['prefix'];
+
+        if (['install', 'update', 'remove'].indexOf(command) > -1) {
+            if (data.positional.length !== 1) {
+                throw new window.conda.CondaError('conda: REST API supports only manipulating one package at a time');
+            }
+            url += '/' + data.positional[0];
+        }
+        else if (command === 'create') {
+        }
+        else {
+            url += '/' + command;
+        }
+
+        var method = {
+            'install': 'post',
+            'create': 'post',
+            'update': 'put',
+            'remove': 'delete'
+        }[command];
+        if (typeof method === "undefined") {
+            method = 'get';
+        }
+
+        if (command === 'config') {
+            if (typeof data.add !== "undefined") {
+                method = 'put';
+                url += '/' + data.add[0] + '/' + data.add[1];
+            }
+            else if (typeof data.set !== "undefined") {
+                method = 'put';
+                data.value = data.set[1];
+            }
+            else if (typeof data.remove !== "undefined") {
+                method = 'delete';
+                url += '/' + data.remove[0] + '/' + data.remove[1];
+            }
+            else if (typeof data.removeKey !== "undefined") {
+                method = 'delete';
+            }
+            else if (typeof data.get !== "undefined") {
+                url += '/' + data.get;
+            }
+            delete data['get'];
+            delete data['add'];
+            delete data['set'];
+            delete data['remove'];
+            delete data['removeKey'];
+        }
+
+        return Promise.resolve($.ajax({
+            contentType: 'application/json',
+            data: data,
+            dataType: 'json',
+            type: method,
+            url: window.conda.API_ROOT + url
+        }));
+    };
+
+    var api = function(command, flags, positional) {
+        if (window.conda.API_METHOD === "RPC") {
+            return rpcApi(command, flags, positional);
+        }
+        else if (window.conda.API_METHOD === "REST") {
+            return restApi(command, flags, positional);
+        }
+        else {
+            throw new window.conda.CondaError("conda: Unrecognized API_METHOD " + window.conda.API_METHOD);
+        }
     };
 
     // Returns Promise like api(), but this object has additional callbacks
@@ -799,6 +887,7 @@ function factory(api) {
         Config: Config,
         Env: Env,
         Package: Package,
-        API_ROOT: '/api'
+        API_ROOT: '/api',
+        API_METHOD: 'REST'
     };
 }
