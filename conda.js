@@ -623,8 +623,14 @@ function factory(api) {
                 Env.getEnvs().then(function(envs) {
                     var promises = [];
                     envs.forEach(function(env) {
-                        promises.push(env.linked());
-                        promises.push(env.revisions());
+                        if (typeof options.loadLinked === "undefined" ||
+                            options.loadLinked) {
+                            promises.push(env.linked());
+                        }
+                        if (typeof options.loadRevisions === "undefined" ||
+                            options.loadRevisions) {
+                            promises.push(env.revisions());
+                        }
                         env.id = env.prefix ? env.prefix : env.name;
                     });
 
