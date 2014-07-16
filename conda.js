@@ -287,6 +287,11 @@ else {
             delete data['removeKey'];
         }
 
+        if (typeof data.positional !== "undefined") {
+            data.q = data.positional;
+            delete data.positional;
+        }
+
         return Promise.resolve($.ajax({
             contentType: 'application/json',
             data: data,
@@ -842,10 +847,10 @@ function factory(api) {
         var positional = [];
 
         if (options.regex !== null) {
-            positional.push(regex);
+            positional.push(options.regex);
         }
         if (options.spec !== null) {
-            positional.push(spec);
+            positional.push(options.spec);
             options.spec = true;
         }
         else {
