@@ -29,6 +29,12 @@ The library is structured asynchronously. Under Node.js `conda-js` calls
 Conda as a subprocess with the `--json` option. In the browser, `conda-js`
 makes a request to the server, which should use the subprocess as well.
 
+### Usage with Backbone
+
+TODO: document which Backbone methods work/do not work
+
+Set `sync` method
+
 ### Usage under Atom Shell/node-webkit
 
 `conda-js` can be used as a Node library under Atom Shell and
