@@ -522,17 +522,17 @@ function factory(api) {
             });
         };
 
-        Env.prototype.launch = function(options) {
+        Env.prototype.run = function(options) {
             var options = defaultOptions(options, {
                 name: null,
                 pkg: null
             });
 
             if (!(options.name || options.pkg)) {
-                throw new CondaError("Env.launch: either name or pkg needed");
+                throw new CondaError("Env.run: either name or pkg needed");
             }
             if (options.name && options.pkg) {
-                throw new CondaError("Env.launch: exactly one of name or pkg allowed");
+                throw new CondaError("Env.run: exactly one of name or pkg allowed");
             }
 
             var pkg = options.name;
@@ -540,7 +540,7 @@ function factory(api) {
                 pkg = options.pkg;
             }
 
-            return api('launch', { prefix: this.prefix }, [pkg]);
+            return api('run', { prefix: this.prefix }, [pkg]);
         };
 
         Env.prototype.removeEnv = function(options) {
@@ -876,8 +876,8 @@ function factory(api) {
         return api('search', options, positional);
     };
 
-    var launch = function(command) {
-        return api('launch', {}, [command]);
+    var run = function(command) {
+        return api('run', {}, [command]);
     };
 
     var clean = function(options) {
@@ -901,7 +901,7 @@ function factory(api) {
     return {
         clean: clean,
         info: info,
-        launch: launch,
+        run: run,
         search: search,
         CondaError: CondaError,
         Config: Config,

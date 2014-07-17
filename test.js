@@ -74,17 +74,17 @@ describe('search', function() {
     });
 });
 
-describe('launch', function() {
+describe('run', function() {
     it('should return a dictionary', function(done) {
-        conda.launch('nonexistent').then(assertType('object')).then(done);
+        conda.run('nonexistent').then(assertType('object')).then(done);
     });
 
     it('should error for a nonexistent app', function(done) {
-        conda.launch('nonexistent').then(assertError).then(done);
+        conda.run('nonexistent').then(assertError).then(done);
     });
 
     it('should error for a package that is not an app', function(done) {
-        conda.launch('python').then(assertError).then(done);
+        conda.run('python').then(assertError).then(done);
     });
 });
 
