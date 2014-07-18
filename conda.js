@@ -139,13 +139,22 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
                     var first = rest.slice(0, dataEnd);
                     rest = rest.slice(dataEnd + 1);
                     buffer.push(first);
-                    var json = JSON.parse(buffer.join(''));
-                    buffer = [];
-                    promise.onProgress(json);
+                    try {
+                        console.log(buffer.join(''))
+                        var json = JSON.parse(buffer.join(''));
+                        buffer = [];
+                        promise.onProgress(json);
+                    }
+                    catch(ex) {
+                        console.log(ex)
+                    }
 
-                    if (json.finished === true) {
+                    if (json.finished === true && rest.indexOf('\0') === -1) {
                         progressing = false;
                     }
+                }
+                if (rest) {
+                    buffer.push(rest);
                 }
             });
 
@@ -558,20 +567,23 @@ function factory(api) {
 
         Env.prototype.removeEnv = function(options) {
             options = defaultOptions(options, {
-                progress: false
+                progress: false,
+                force: false
             });
 
             return api('remove', {
                 all: true,
                 prefix: this.prefix,
-                quiet: !options.progress
+                quiet: !options.progress,
+                force: options.force
             });
         };
 
         Env.create = function(options) {
             var options = nameOrPrefixOptions("Env.create", options, {
                 progress: false,
-                packages: []
+                packages: [],
+                force: false
             });
 
             if (options.packages.length === 0) {
@@ -654,7 +666,11 @@ function factory(api) {
                 break;
 
             case "delete":
-                return model.attributes.removeEnv().then(function(result) {
+                var force = false;
+                if (typeof options.force !== "undefined") {
+                    force = options.force;
+                }
+                return model.attributes.removeEnv({ force: force }).then(function(result) {
                     options.success(result);
                 });
                 break;
