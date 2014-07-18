@@ -350,6 +350,18 @@ else {
 function factory(api) {
     "use strict";
 
+    var PATH_SEP = '/';
+    if (typeof process !== "undefined") {
+        if (process.platform === 'win32') {
+            PATH_SEP = '\\';
+        }
+    }
+    else if (typeof navigator !== "undefined") {
+        if (/windows/.test(navigator.userAgent.toLowerCase())) {
+            PATH_SEP = '\\';
+        }
+    }
+
     var defaultOptions = function(options, defaults) {
         if (typeof options === "undefined" || options === null) {
             return defaults;
@@ -592,7 +604,7 @@ function factory(api) {
                 var prefixes = info.envs;
                 for (var i = 0; i < prefixes.length; i++) {
                     var prefix = prefixes[i];
-                    var name = prefix.split('/'); // TODO Windows?
+                    var name = prefix.split(PATH_SEP);
                     name = name[name.length - 1];
                     envs.push(new Env(name, prefix));
                 }
