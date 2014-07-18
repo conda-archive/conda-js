@@ -656,8 +656,6 @@ function factory(api) {
 
     var Package = (function() {
         var _cache = {};
-        var _search_cache = {};
-        var _search_cache_promise = null;
 
         function Package(fn, info) {
             _cache[fn] = this;
@@ -691,19 +689,11 @@ function factory(api) {
             // 3. Cache that index.
             // 4. Fall back on `conda info` only if package is not in index
             // (when the package was built/installed locally, for instance)
-            if (_search_cache_promise === null) {
-                _search_cache_promise = search().then(function(result) {
-                    _search_cache = result;
-                });
-            }
-            if (typeof reload === "undefined") {
-                reload = false;
-            }
 
             if (!_cache.hasOwnProperty(fn) || reload) {
-                return _search_cache_promise.then(function(search) {
+                return index().then(function(search_cache) {
                     var spec = Package.splitFn(fn);
-                    var packages = _search_cache[spec.name];
+                    var packages = search_cache[spec.name];
                     if (typeof packages === "undefined") {
                         return api('info', {}, fn + '.tar.bz2').then(function(info) {
                             info = info[fn + '.tar.bz2'];
@@ -852,7 +842,8 @@ function factory(api) {
     var search = function(options) {
         options = defaultOptions(options, {
             regex: null,
-            spec: null
+            spec: null,
+            useIndexCache: false
         });
 
         if (options.regex && options.spec) {
@@ -874,6 +865,24 @@ function factory(api) {
         delete options.regex;
 
         return api('search', options, positional);
+    };
+
+    /**
+       The package index - conda search --json.
+
+       This method caches the index as it is an expensive call (1-4 seconds).
+     */
+    var _search_cache = null;
+    var index = function(options) {
+        options = defaultOptions(options, {
+            reload: false
+        });
+
+        if (_search_cache === null || options.reload) {
+            _search_cache = search({ useIndexCache: !options.reload });
+        }
+
+        return _search_cache;
     };
 
     var run = function(command) {
@@ -900,6 +909,7 @@ function factory(api) {
 
     return {
         clean: clean,
+        index: index,
         info: info,
         run: run,
         search: search,
