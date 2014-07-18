@@ -225,7 +225,7 @@ else {
         // environment are structured more RESTfully - additionally, we use
         // GET/POST/PUT/DELETE based on the subcommand.
         // Commands involving --name and --prefix are translated to
-        // /api/env/name/<name>/subcommand<? other Argos>
+        // /api/env/name/<name>/subcommand<? other args>
         var data = __parse(flags, positional);
         var url = '';
 
@@ -276,8 +276,9 @@ else {
             }
             else if (typeof data.removeKey !== "undefined") {
                 method = 'delete';
+                url += '/' + data.removeKey;
             }
-            else if (typeof data.get !== "undefined") {
+            else if (typeof data.get !== "undefined" && data.get !== true) {
                 url += '/' + data.get;
             }
             delete data['get'];
@@ -287,10 +288,10 @@ else {
             delete data['removeKey'];
         }
 
-        if (typeof data.positional !== "undefined") {
+        if (typeof data.positional !== "undefined" && data.positional.length > 0) {
             data.q = data.positional;
-            delete data.positional;
         }
+        delete data.positional;
 
         return Promise.resolve($.ajax({
             contentType: 'application/json',
