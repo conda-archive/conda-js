@@ -568,14 +568,14 @@ function factory(api) {
         Env.prototype.removeEnv = function(options) {
             options = defaultOptions(options, {
                 progress: false,
-                force: false
+                forcePscheck: false
             });
 
             return api('remove', {
                 all: true,
                 prefix: this.prefix,
                 quiet: !options.progress,
-                force: options.force
+                forcePscheck: options.forcePscheck
             });
         };
 
@@ -583,7 +583,7 @@ function factory(api) {
             var options = nameOrPrefixOptions("Env.create", options, {
                 progress: false,
                 packages: [],
-                force: false
+                forcePscheck: false
             });
 
             if (options.packages.length === 0) {
@@ -666,11 +666,11 @@ function factory(api) {
                 break;
 
             case "delete":
-                var force = false;
-                if (typeof options.force !== "undefined") {
-                    force = options.force;
+                var forcePscheck = false;
+                if (typeof options.forcePscheck !== "undefined") {
+                    forcePscheck = options.forcePscheck;
                 }
-                return model.attributes.removeEnv({ force: force }).then(function(result) {
+                return model.attributes.removeEnv({ forcePscheck: forcePscheck }).then(function(result) {
                     options.success(result);
                 });
                 break;
