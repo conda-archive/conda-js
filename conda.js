@@ -10,6 +10,14 @@ var __makeProgressPromise = function(promise) {
         callbacks.forEach(function(f) { f(data); });
     };
 
+    var oldThen = promise.then;
+
+    promise.then = function(f, g) {
+        var result = oldThen(f, g);
+        result.progress = promise.progress.bind(result);
+        return result;
+    };
+
     return promise;
 };
 
@@ -341,7 +349,6 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
                     rest = rest.slice(dataEnd + 1);
                     buffer.push(first);
                     try {
-                        console.log(buffer.join(''))
                         var json = JSON.parse(buffer.join(''));
                         buffer = [];
                         promise.onProgress(json);
@@ -637,10 +644,6 @@ function factory(api) {
                 }
                 return data;
             });
-            // TODO formalize/automate this - preserves progress API
-            if (typeof progress.progress !== "undefined") {
-                promise.progress = progress.progress.bind(progress);
-            }
             return promise;
         };
 
