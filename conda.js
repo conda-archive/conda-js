@@ -249,12 +249,15 @@ else {
         delete data['prefix'];
 
         if (['install', 'update', 'remove'].indexOf(command) > -1) {
-            if (data.positional.length !== 1) {
+            if (data.positional.length > 1) {
                 throw new window.conda.CondaError('conda: REST API supports only manipulating one package at a time');
             }
-            url += '/' + data.positional[0];
+            if (data.positional.length === 1) {
+                url += '/' + data.positional[0];
+            }
         }
-        else if (command === 'create') {
+        else if (command === 'create' || command === 'list') {
+            // Ignore these - don't append the command to the URL
         }
         else {
             url += '/' + command;
