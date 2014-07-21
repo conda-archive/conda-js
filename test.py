@@ -2,9 +2,8 @@ import sys
 import flask
 
 method = 'rpc'
-if len(sys.argv) > 1:
-    if sys.argv[1] == '--rest':
-        method = 'rest'
+if '--rest' in sys.argv:
+    method = 'rest'
 
 if method == 'rpc':
     from agent import rpc as blueprint

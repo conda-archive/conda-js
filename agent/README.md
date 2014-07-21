@@ -19,9 +19,11 @@ Both RPC and REST are supported.
 Both:
 
 - Progress bar API not implemented
+- Backbone interop methods (Models, Collections, etc.) (`conda.backbone.js`?)
 
 REST:
 
-- `conda.run` not implemented (but `conda.Env.run` is)
+- `/api/pkgs`
+- Test with Backbone
 
 RPC:

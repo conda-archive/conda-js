@@ -242,7 +242,9 @@ else {
             url += '/env/name/' + encodeURIComponent(data.name);
         }
         else if (typeof data.prefix !== "undefined") {
-            url += '/env/prefix/' + encodeURIComponent(data.prefix);
+            // Double-encode so URL routers aren't confused by slashes if
+            // they decode before routing
+            url += '/env/prefix/' + encodeURIComponent(encodeURIComponent(data.prefix));
         }
 
         delete data['name'];
@@ -255,6 +257,11 @@ else {
             if (data.positional.length === 1) {
                 url += '/' + data.positional[0];
             }
+            data.positional = [];
+        }
+        else if (command === 'run' && url.slice(0, 4) === '/env') {
+            url += '/' + data.positional[0] + '/run';
+            data.positional = [];
         }
         else if (command === 'create' || command === 'list') {
             // Ignore these - don't append the command to the URL
@@ -281,6 +288,7 @@ else {
             else if (typeof data.set !== "undefined") {
                 method = 'put';
                 data.value = data.set[1];
+                url += '/' + data.set[0];
             }
             else if (typeof data.remove !== "undefined") {
                 method = 'delete';
@@ -305,6 +313,9 @@ else {
         }
         delete data.positional;
 
+        if (method !== 'get') {
+            data = JSON.stringify(data);
+        }
         return Promise.resolve($.ajax({
             contentType: 'application/json',
             data: data,
