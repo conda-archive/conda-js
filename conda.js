@@ -30,20 +30,13 @@ function apiContext() {
         return data;
     }
 
-    var rpcApi = function(command, flags, positional) {
+    var rpcApi = function(command, data) {
         // URL structure: /api/command
         // Flags are GET query string or POST body
         // Positional is in query string or POST body
 
         // Translation of JS flag camelCase to command line flag
         // dashed-version occurs server-side
-
-        var data = __parse(flags, positional);
-
-        if (flags && typeof flags.quiet !== "undefined" && flags.quiet === false) {
-            // Handle progress bars
-            return progressApi(command, flags, positional);
-        }
 
         var method = 'post';
         if (['info', 'list', 'search'].indexOf(command) !== -1 ||
@@ -66,13 +59,12 @@ function apiContext() {
         }));
     };
 
-    var restApi = function(command, flags, positional) {
+    var restApi = function(command, data) {
         // URL structure is same as RPC API, except commands involving an
         // environment are structured more RESTfully - additionally, we use
         // GET/POST/PUT/DELETE based on the subcommand.
         // Commands involving --name and --prefix are translated to
         // /api/env/name/<name>/subcommand<? other args>
-        var data = __parse(flags, positional);
         var url = '';
 
         if (typeof data.name !== "undefined") {
@@ -163,11 +155,18 @@ function apiContext() {
     };
 
     var api = function(command, flags, positional) {
+        var data = __parse(flags, positional);
+
+        if (flags && typeof flags.quiet !== "undefined" && flags.quiet === false) {
+            // Handle progress bars
+            return progressApi(command, flags, positional);
+        }
+
         if (context.conda.API_METHOD === "RPC") {
-            return rpcApi(command, flags, positional);
+            return rpcApi(command, data);
         }
         else if (context.conda.API_METHOD === "REST") {
-            return restApi(command, flags, positional);
+            return restApi(command, data);
         }
         else {
             throw new context.conda.CondaError("conda: Unrecognized API_METHOD " + context.conda.API_METHOD);

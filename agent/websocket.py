@@ -7,6 +7,8 @@ import tornado.iostream
 import tornado.web
 import tornado.wsgi
 
+from .common import parse
+
 
 class CondaJsWebSocketRouter(sockjs.tornado.SockJSConnection):
     def on_message(self, message):

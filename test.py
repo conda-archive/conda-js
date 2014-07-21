@@ -15,13 +15,21 @@ if __name__ == '__main__':
     app = flask.Flask(__name__, template_folder='./')
     app.config['SECRET_KEY'] = 'secret'
 
-    @app.route('/<fname>')
-    def file(fname):
-        return open(fname).read()
-
     @app.route('/')
     def index():
         return flask.render_template('test.html')
+
+    @app.route('/mocha.js')
+    def mochajs():
+        return open('./node_modules/mocha/mocha.js').read()
+
+    @app.route('/mocha.css')
+    def mochacss():
+        return open('./node_modules/mocha/mocha.css').read()
+
+    @app.route('/<fname>')
+    def file(fname):
+        return open(fname).read()
 
     print("Using method", method)
 
