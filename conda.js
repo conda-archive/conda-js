@@ -13,10 +13,212 @@ var __makeProgressPromise = function(promise) {
     return promise;
 };
 
+
+// Browser API
+function apiContext() {
+    var __parse = function(flags, positional) {
+        if (typeof flags === "undefined") {
+            flags = {};
+        }
+        if (typeof positional === "undefined") {
+            positional = [];
+        }
+
+        var data = flags;
+        data.positional = positional;
+
+        return data;
+    }
+
+    var rpcApi = function(command, flags, positional) {
+        // URL structure: /api/command
+        // Flags are GET query string or POST body
+        // Positional is in query string or POST body
+
+        // Translation of JS flag camelCase to command line flag
+        // dashed-version occurs server-side
+
+        var data = __parse(flags, positional);
+
+        if (flags && typeof flags.quiet !== "undefined" && flags.quiet === false) {
+            // Handle progress bars
+            return progressApi(command, flags, positional);
+        }
+
+        var method = 'post';
+        if (['info', 'list', 'search'].indexOf(command) !== -1 ||
+            command === 'config' && flags.get) {
+            method = 'get';
+        }
+
+        var contentType = '';
+        if (method === 'post') {
+            contentType = 'application/json';
+            data = JSON.stringify(data);
+        }
+
+        return Promise.resolve($.ajax({
+            contentType: contentType,
+            data: data,
+            dataType: 'json',
+            type: method,
+            url: context.conda.API_ROOT + "/" + command
+        }));
+    };
+
+    var restApi = function(command, flags, positional) {
+        // URL structure is same as RPC API, except commands involving an
+        // environment are structured more RESTfully - additionally, we use
+        // GET/POST/PUT/DELETE based on the subcommand.
+        // Commands involving --name and --prefix are translated to
+        // /api/env/name/<name>/subcommand<? other args>
+        var data = __parse(flags, positional);
+        var url = '';
+
+        if (typeof data.name !== "undefined") {
+            url += '/env/name/' + encodeURIComponent(data.name);
+        }
+        else if (typeof data.prefix !== "undefined") {
+            // Double-encode so URL routers aren't confused by slashes if
+            // they decode before routing
+            url += '/env/prefix/' + encodeURIComponent(encodeURIComponent(data.prefix));
+        }
+
+        delete data['name'];
+        delete data['prefix'];
+
+        if (['install', 'update', 'remove'].indexOf(command) > -1) {
+            if (data.positional.length > 1) {
+                throw new context.conda.CondaError('conda: REST API supports only manipulating one package at a time');
+            }
+            if (data.positional.length === 1) {
+                url += '/' + data.positional[0];
+            }
+            data.positional = [];
+        }
+        else if (command === 'run' && url.slice(0, 4) === '/env') {
+            url += '/' + data.positional[0] + '/run';
+            data.positional = [];
+        }
+        else if (command === 'create' || command === 'list') {
+            // Ignore these - don't append the command to the URL
+        }
+        else {
+            url += '/' + command;
+        }
+
+        var method = {
+            'install': 'post',
+            'create': 'post',
+            'update': 'put',
+            'remove': 'delete'
+        }[command];
+        if (typeof method === "undefined") {
+            method = 'get';
+        }
+
+        if (command === 'config') {
+            if (typeof data.add !== "undefined") {
+                method = 'put';
+                url += '/' + data.add[0] + '/' + data.add[1];
+            }
+            else if (typeof data.set !== "undefined") {
+                method = 'put';
+                data.value = data.set[1];
+                url += '/' + data.set[0];
+            }
+            else if (typeof data.remove !== "undefined") {
+                method = 'delete';
+                url += '/' + data.remove[0] + '/' + data.remove[1];
+            }
+            else if (typeof data.removeKey !== "undefined") {
+                method = 'delete';
+                url += '/' + data.removeKey;
+            }
+            else if (typeof data.get !== "undefined" && data.get !== true) {
+                url += '/' + data.get;
+            }
+            delete data['get'];
+            delete data['add'];
+            delete data['set'];
+            delete data['remove'];
+            delete data['removeKey'];
+        }
+
+        if (typeof data.positional !== "undefined" && data.positional.length > 0) {
+            data.q = data.positional;
+        }
+        delete data.positional;
+
+        if (method !== 'get') {
+            data = JSON.stringify(data);
+        }
+        return Promise.resolve($.ajax({
+            contentType: 'application/json',
+            data: data,
+            dataType: 'json',
+            type: method,
+            url: context.conda.API_ROOT + url
+        }));
+    };
+
+    var api = function(command, flags, positional) {
+        if (context.conda.API_METHOD === "RPC") {
+            return rpcApi(command, flags, positional);
+        }
+        else if (context.conda.API_METHOD === "REST") {
+            return restApi(command, flags, positional);
+        }
+        else {
+            throw new context.conda.CondaError("conda: Unrecognized API_METHOD " + context.conda.API_METHOD);
+        }
+    };
+    var context = api;
+
+    // Returns Promise like api(), but this object has additional callbacks
+    // for progress bars. Retrieves data via websocket.
+    var progressApi = function(command, flags, positional) {
+        var promise = new Promise(function(fulfill, reject) {
+            var data = __parse(flags, positional);
+            positional = data.positional;
+            delete data.positional;
+
+            var socket = new SockJS(context.conda.API_ROOT + '_ws/');
+            socket.onopen = function() {
+                socket.send(JSON.stringify({
+                    subcommand: command,
+                    flags: data,
+                    positional: positional
+                }));
+            };
+            socket.onmessage = function(e) {
+                var data = JSON.parse(e.data);
+                if (typeof data.progress !== "undefined") {
+                    promise.onProgress(data.progress);
+                }
+                else if (typeof data.finished !== "undefined") {
+                    fulfill(data.finished);
+                }
+            };
+        });
+
+        return __makeProgressPromise(promise);
+    };
+
+    return api;
+}
+
+var newContext = function() {
+    var api = apiContext();
+    var conda = factory(api);
+    api.conda = conda;
+    return conda;
+};
+
 // Set up module to run in browser and in Node.js
 // Based loosely on https://github.com/umdjs/umd/blob/master/nodeAdapter.js
 if ((typeof module === 'object' && typeof define !== 'function') || (window && window.nodeRequire)) {
-    // We are in Node.js or atom
+    // We are in Node.js or Node-webkit/Atom Shell
 
     if (typeof window !== "undefined" && window.nodeRequire) {
         var require = window.nodeRequire;
@@ -176,203 +378,23 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
     module.exports = factory(api);
     module.exports.api = api;
     module.exports.progressApi = progressApi;
+
+    if (typeof window !== "undefined" && typeof window.nodeRequire !== "undefined") {
+        // For node-webkit/Atom Shell we provide the browser API as these
+        // environments are a mix of Node and browser
+        module.exports.newContext = newContext;
+    }
 }
 else {
     // We are in the browser
-    var __parse = function(flags, positional) {
-        if (typeof flags === "undefined") {
-            flags = {};
-        }
-        if (typeof positional === "undefined") {
-            positional = [];
-        }
-
-        var data = flags;
-        data.positional = positional;
-
-        return data;
-    }
-
-    var rpcApi = function(command, flags, positional) {
-        // URL structure: /api/command
-        // Flags are GET query string or POST body
-        // Positional is in query string or POST body
-
-        // Translation of JS flag camelCase to command line flag
-        // dashed-version occurs server-side
-
-        var data = __parse(flags, positional);
-
-        if (flags && typeof flags.quiet !== "undefined" && flags.quiet === false) {
-            // Handle progress bars
-            return progressApi(command, flags, positional);
-        }
-
-        var method = 'post';
-        if (['info', 'list', 'search'].indexOf(command) !== -1 ||
-            command === 'config' && flags.get) {
-            method = 'get';
-        }
-
-        var contentType = '';
-        if (method === 'post') {
-            contentType = 'application/json';
-            data = JSON.stringify(data);
-        }
-
-        return Promise.resolve($.ajax({
-            contentType: contentType,
-            data: data,
-            dataType: 'json',
-            type: method,
-            url: window.conda.API_ROOT + "/" + command
-        }));
-    };
-
-    var restApi = function(command, flags, positional) {
-        // URL structure is same as RPC API, except commands involving an
-        // environment are structured more RESTfully - additionally, we use
-        // GET/POST/PUT/DELETE based on the subcommand.
-        // Commands involving --name and --prefix are translated to
-        // /api/env/name/<name>/subcommand<? other args>
-        var data = __parse(flags, positional);
-        var url = '';
-
-        if (typeof data.name !== "undefined") {
-            url += '/env/name/' + encodeURIComponent(data.name);
-        }
-        else if (typeof data.prefix !== "undefined") {
-            // Double-encode so URL routers aren't confused by slashes if
-            // they decode before routing
-            url += '/env/prefix/' + encodeURIComponent(encodeURIComponent(data.prefix));
-        }
-
-        delete data['name'];
-        delete data['prefix'];
-
-        if (['install', 'update', 'remove'].indexOf(command) > -1) {
-            if (data.positional.length > 1) {
-                throw new window.conda.CondaError('conda: REST API supports only manipulating one package at a time');
-            }
-            if (data.positional.length === 1) {
-                url += '/' + data.positional[0];
-            }
-            data.positional = [];
-        }
-        else if (command === 'run' && url.slice(0, 4) === '/env') {
-            url += '/' + data.positional[0] + '/run';
-            data.positional = [];
-        }
-        else if (command === 'create' || command === 'list') {
-            // Ignore these - don't append the command to the URL
-        }
-        else {
-            url += '/' + command;
-        }
-
-        var method = {
-            'install': 'post',
-            'create': 'post',
-            'update': 'put',
-            'remove': 'delete'
-        }[command];
-        if (typeof method === "undefined") {
-            method = 'get';
-        }
-
-        if (command === 'config') {
-            if (typeof data.add !== "undefined") {
-                method = 'put';
-                url += '/' + data.add[0] + '/' + data.add[1];
-            }
-            else if (typeof data.set !== "undefined") {
-                method = 'put';
-                data.value = data.set[1];
-                url += '/' + data.set[0];
-            }
-            else if (typeof data.remove !== "undefined") {
-                method = 'delete';
-                url += '/' + data.remove[0] + '/' + data.remove[1];
-            }
-            else if (typeof data.removeKey !== "undefined") {
-                method = 'delete';
-                url += '/' + data.removeKey;
-            }
-            else if (typeof data.get !== "undefined" && data.get !== true) {
-                url += '/' + data.get;
-            }
-            delete data['get'];
-            delete data['add'];
-            delete data['set'];
-            delete data['remove'];
-            delete data['removeKey'];
-        }
-
-        if (typeof data.positional !== "undefined" && data.positional.length > 0) {
-            data.q = data.positional;
-        }
-        delete data.positional;
-
-        if (method !== 'get') {
-            data = JSON.stringify(data);
-        }
-        return Promise.resolve($.ajax({
-            contentType: 'application/json',
-            data: data,
-            dataType: 'json',
-            type: method,
-            url: window.conda.API_ROOT + url
-        }));
-    };
-
-    var api = function(command, flags, positional) {
-        if (window.conda.API_METHOD === "RPC") {
-            return rpcApi(command, flags, positional);
-        }
-        else if (window.conda.API_METHOD === "REST") {
-            return restApi(command, flags, positional);
-        }
-        else {
-            throw new window.conda.CondaError("conda: Unrecognized API_METHOD " + window.conda.API_METHOD);
-        }
-    };
-
-    // Returns Promise like api(), but this object has additional callbacks
-    // for progress bars. Retrieves data via websocket.
-    var progressApi = function(command, flags, positional) {
-        var promise = new Promise(function(fulfill, reject) {
-            var data = __parse(flags, positional);
-            positional = data.positional;
-            delete data.positional;
-
-            var socket = new SockJS('http://' + window.location.host + window.conda.API_ROOT + '_ws/');
-            socket.onopen = function() {
-                socket.send(JSON.stringify({
-                    subcommand: command,
-                    flags: data,
-                    positional: positional
-                }));
-            };
-            socket.onmessage = function(e) {
-                var data = JSON.parse(e.data);
-                if (typeof data.progress !== "undefined") {
-                    promise.onProgress(data.progress);
-                }
-                else if (typeof data.finished !== "undefined") {
-                    fulfill(data.finished);
-                }
-            };
-        });
-
-        return __makeProgressPromise(promise);
-    };
-
-    window.conda = factory(api);
+    window.conda = newContext();
+    window.conda.newContext = newContext;
 }
 
 function factory(api) {
     "use strict";
 
+    // TODO make this context-dependent
     var PATH_SEP = '/';
     if (typeof process !== "undefined") {
         if (process.platform === 'win32') {

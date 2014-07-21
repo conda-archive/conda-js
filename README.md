@@ -45,6 +45,15 @@ redefine `require`). Under Atom Shell, it should be required using
 `nodeRequire('conda')` and not through the `remote` library (its IPC is
 incomplete and will break the library).
 
+## Contexts
+
+Applications interacting with multiple Conda installations need to configure
+`conda.API_ROOT` and `conda.API_METHOD` accordingly. However, these are
+globals and setting them for one installation will interfere with operations
+on others. Thus, `conda-js` contains a function `conda.newContext` that
+creates a new `conda` library object with its own globals. Create one for
+each configuration.
+
 ## Testing and Development Server
 
 To make the library easier to debug, it comes with its own server. Simply
