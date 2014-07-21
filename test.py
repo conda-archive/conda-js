@@ -28,4 +28,13 @@ if __name__ == '__main__':
     blueprint.conda_js.url_prefix = '/api'
     app.register_blueprint(blueprint.conda_js)
 
-    app.run(port=8000, debug=True)
+    if '--progress' in sys.argv:
+        print("Using websockets")
+
+        import tornado.ioloop
+        from agent.websocket import wrap
+        wsgi_app, application = wrap(app, '/api_ws', debug=False)
+        application.listen(8000)
+        tornado.ioloop.IOLoop.instance().start()
+    else:
+        app.run(port=8000, debug=True)
