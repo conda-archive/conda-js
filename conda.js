@@ -11,8 +11,14 @@ var __makeProgressPromise = function(promise) {
     };
 
     var fixThen = function(promise) {
+        if (typeof Promise.prototype.then === "undefined") {
+            var oldThen = promise.then;
+        }
+        else {
+            var oldThen = Promise.prototype.then.bind(promise);
+        }
         promise.then = function(f, g) {
-            var result = Promise.prototype.then.bind(promise)(f, g);
+            var result = oldThen(f, g);
             result.progress = promise.progress.bind(result);
             fixThen(result);
             return result;
