@@ -208,3 +208,82 @@ describe('Env', function() {
     //     });
     // });
 });
+
+
+describe('Package', function() {
+    describe('.parseVersion', function() {
+        it('should parse any number of parts', function() {
+            assert.deepEqual(conda.Package.parseVersion("1.2.3.4.5").parts, [1, 2, 3, 4, 5]);
+        });
+
+        it('should parse RC parts', function() {
+            assert.deepEqual(conda.Package.parseVersion("1.2.3rc1").parts, [1, 2, 3]);
+            assert.deepEqual(conda.Package.parseVersion("1.2.3rc1").rc, 1);
+            assert.deepEqual(conda.Package.parseVersion("1.2.3").rc, null);
+        });
+    });
+
+    describe('.isGreater', function() {
+        it('should compare build numbers', function() {
+            assert.ok(conda.Package.isGreater({
+                version: "1.2.3",
+                build_number: 2
+            }, {
+                version: "1.2.3",
+                build_number: 3
+            }));
+        });
+
+        it('should compare versions', function() {
+            assert.ok(conda.Package.isGreater({
+                version: "1.2.3",
+                build_number: 3
+            }, {
+                version: "1.2.6",
+                build_number: 3
+            }));
+            assert.ok(conda.Package.isGreater({
+                version: "1.2.3",
+                build_number: 3
+            }, {
+                version: "1.3.0",
+                build_number: 3
+            }));
+            assert.ok(conda.Package.isGreater({
+                version: "1.2.3",
+                build_number: 3
+            }, {
+                version: "2.0.0",
+                build_number: 3
+            }));
+        });
+
+        it('should compare versions of unequal length', function() {
+            assert.ok(conda.Package.isGreater({
+                version: "1.2",
+                build_number: 3
+            }, {
+                version: "1.2.3",
+                build_number: 3
+            }));
+        });
+
+        it('should compare release candidate numbers', function() {
+            assert.ok(conda.Package.isGreater({
+                version: "1.2.3rc1",
+                build_number: 3
+            }, {
+                version: "1.2.3",
+                build_number: 3
+            }));
+
+            assert.ok(conda.Package.isGreater({
+                version: "1.2.3rc1",
+                build_number: 3
+            }, {
+                version: "1.2.3rc2",
+                build_number: 3
+            }));
+        });
+    });
+});

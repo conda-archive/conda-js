@@ -732,6 +732,7 @@ function factory(api) {
             this.fn = fn;
             this.name = info.name;
             this.build = info.build;
+            this.build_number = info.build_number;
             this.dist = this.fn;
             this.version = info.version;
             this.info = info;
@@ -750,6 +751,71 @@ function factory(api) {
                 build: parts[parts.length - 1],
                 version: parts[parts.length - 2]
             };
+        };
+
+        Package.parseVersion = function(version) {
+            var matches = version.match(/(\d)+\.(\d+)((?:\.\d)*)(rc\d+)?/);
+            var parts = [parseInt(matches[1], 10), parseInt(matches[2], 10)];
+            var extra = matches[3];
+            if (typeof extra !== "undefined") {
+                extra = extra.split(/\./g).slice(1);
+                extra.forEach(function(e) {
+                    parts.push(parseInt(e, 10));
+                });
+            }
+            var rc = matches[4];
+            if (typeof rc !== "undefined") {
+                rc = parseInt(rc.slice(2), 10);
+            }
+            else {
+                rc = null
+            }
+            return {
+                parts: parts,
+                rc: rc
+            };
+        };
+
+        /** Is pkg2 newer than pkg1
+         */
+        Package.isGreater = function(pkg1, pkg2) {
+            if (pkg1.version === pkg2.version) {
+                return pkg2.build_number > pkg1.build_number;
+            }
+
+            var parts1 = Package.parseVersion(pkg1.version);
+            var parts2 = Package.parseVersion(pkg2.version);
+            for (var i = 0, len = Math.max(parts1.parts.length, parts2.parts.length);
+                 i < len; i++) {
+                var part1 = parts1.parts[i];
+                var part2 = parts2.parts[i];
+                var part1d = typeof part1 !== "undefined";
+                var part2d = typeof part2 !== "undefined";
+
+                if (part1d && !part2d) {
+                    return false;
+                }
+                else if (!part1d && part2d) {
+                    return true;
+                }
+
+                if (part2 > part1) {
+                    return true;
+                }
+                if (part2 < part1) {
+                    return false;
+                }
+            }
+
+            if (parts1.rc !== null && parts2.rc === null) {
+                return true;
+            }
+            else if (parts1.rc === null && parts2.rc !== null) {
+                return false;
+            }
+            else {
+                return parts2.rc > parts1.rc;
+            }
         };
 
         Package.load = function(fn, reload) {
