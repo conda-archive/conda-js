@@ -10,13 +10,16 @@ var __makeProgressPromise = function(promise) {
         callbacks.forEach(function(f) { f(data); });
     };
 
-    var oldThen = promise.then;
-
-    promise.then = function(f, g) {
-        var result = oldThen(f, g);
-        result.progress = promise.progress.bind(result);
-        return result;
+    var fixThen = function(promise) {
+        promise.then = function(f, g) {
+            var result = Promise.prototype.then.bind(promise)(f, g);
+            result.progress = promise.progress.bind(result);
+            fixThen(result);
+            return result;
+        };
     };
+
+    fixThen(promise);
 
     return promise;
 };
