@@ -230,12 +230,17 @@ var newContext = function() {
 if ((typeof module === 'object' && typeof define !== 'function') || (window && window.nodeRequire)) {
     // We are in Node.js or Node-webkit/Atom Shell
 
+    // We don't want to redefine require - in the browser it confuses AMD
+    // apps and in Node it confuses browserify.
     if (typeof window !== "undefined" && window.nodeRequire) {
-        var require = window.nodeRequire;
+        var ChildProcess = window.nodeRequire('child_process');
+        // We assume the Promise polyfill has been included.
+        var Promise = window.Promise;
     }
-
-    var ChildProcess = require('child_process');
-    var Promise = require('promise');
+    else {
+        var ChildProcess = require('child_process');
+        var Promise = require('promise');
+    }
 
     // converts a name like useIndexCache to --use-index-cache
     var __convert = function(f) {
@@ -384,14 +389,18 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
         return __makeProgressPromise(promise);
     };
 
-    module.exports = factory(api);
-    module.exports.api = api;
-    module.exports.progressApi = progressApi;
-
     if (typeof window !== "undefined" && typeof window.nodeRequire !== "undefined") {
-        // For node-webkit/Atom Shell we provide the browser API as these
-        // environments are a mix of Node and browser
-        module.exports.newContext = newContext;
+        window.conda = factory(api);
+        window.conda.api = api;
+        window.conda.progressApi = api;
+        // For node-webkit/Atom Shell we provide the browser API as well, as
+        // these environments are a mix of Node and browser
+        window.conda.newContext = newContext;
+    }
+    if (typeof module !== "undefined" && typeof module.exports !== "undefined") {
+        module.exports = factory(api);
+        module.exports.api = api;
+        module.exports.progressApi = progressApi;
     }
 }
 else {
