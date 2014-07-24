@@ -256,6 +256,27 @@ describe('Package', function() {
                 version: "2.0.0",
                 build_number: 3
             }));
+            assert.ok(conda.Package.isGreater({
+                version: "1.12.30",
+                build_number: 3
+            }, {
+                version: "2.10.0",
+                build_number: 3
+            }));
+            assert.ok(conda.Package.isGreater({
+                version: "19.12.30",
+                build_number: 3
+            }, {
+                version: "21.10.15",
+                build_number: 3
+            }));
+            assert.ok(conda.Package.isGreater({
+                version: "19.12.3",
+                build_number: 3
+            }, {
+                version: "19.12.15",
+                build_number: 3
+            }));
         });
 
         it('should compare versions of unequal length', function() {

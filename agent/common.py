@@ -29,7 +29,7 @@ def parse(subcommand, flags, positional):
         if value is not False and value is not None:
             cmdList.append(convert(key))
             if isinstance(value, (list, tuple)):
-                cmdList.extend(value)
+                cmdList.extend(map(str, value))
             elif value is not True:
                 cmdList.append(value)
 
@@ -43,6 +43,10 @@ def parse(subcommand, flags, positional):
 def run(cmdList):
     # Avoid subprocess overhead
     # TODO: benchmark vs subprocess
+
+    if '--dummy' in sys.argv:
+        print(cmdList)
+        return ''
 
     from conda import cli
     stdout = StringIO()

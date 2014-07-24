@@ -736,6 +736,15 @@ function factory(api) {
             }
         };
 
+        /**
+           Construct an instance of this class from JSON.
+
+           Intended to be used as the model attribute for a Backbone
+           Collection when the server is exposing a RESTful API.
+         */
+        Env.backboneModel = function(data) {
+        };
+
         return Env;
     })();
 
@@ -1002,7 +1011,9 @@ function factory(api) {
         options = defaultOptions(options, {
             regex: null,
             spec: null,
-            useIndexCache: false
+            useIndexCache: false,
+            outdated: false,
+            unknown: false
         });
 
         if (options.regex && options.spec) {
@@ -1038,7 +1049,7 @@ function factory(api) {
         });
 
         if (_search_cache === null || options.reload) {
-            _search_cache = search({ useIndexCache: !options.reload });
+            _search_cache = search({ useIndexCache: !options.reload, unknown: true });
         }
 
         return _search_cache;
