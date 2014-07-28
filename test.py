@@ -27,16 +27,22 @@ if __name__ == '__main__':
     def mochacss():
         return open('./node_modules/mocha/mocha.css').read()
 
-    @app.route('/<fname>')
-    def file(fname):
-        return open(fname).read()
+    @app.route('/test.browser.js')
+    def test():
+        return open('test.browser.js').read()
+
+    @app.route('/conda.js')
+    def conda():
+        return open('conda.js').read()
 
     print("Using method", method)
 
     blueprint.conda_js.url_prefix = '/api'
     app.register_blueprint(blueprint.conda_js)
 
-    if '--progress' in sys.argv:
+    if '--no-progress' in sys.argv:
+        app.run(port=8000, debug=True)
+    else:
         print("Using websockets")
 
         import tornado.ioloop
@@ -44,5 +50,3 @@ if __name__ == '__main__':
         wsgi_app, application = wrap(app, '/api_ws', debug=False)
         application.listen(8000)
         tornado.ioloop.IOLoop.instance().start()
-    else:
-        app.run(port=8000, debug=True)
