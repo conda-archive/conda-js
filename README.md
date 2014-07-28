@@ -31,9 +31,19 @@ makes a request to the server, which should use the subprocess as well.
 
 ### Usage with Backbone
 
-TODO: document which Backbone methods work/do not work
+`conda-js` includes helpers for interacting with Backbone. Currently the
+only helper is for syncing environment data into a Backbone Collection:
 
-Set `sync` method
+```coffee
+class Environment extends Backbone.Model
+  sync: conda.Env.backboneSync  # necessary for model.destroy()
+
+class Environments extends Backbone.Collection
+  model: Environment
+  sync: conda.Env.backboneSync  # necessary for collection.fetch()
+```
+
+Only `fetch` and `destroy` are supported.
 
 ### Usage under Atom Shell/node-webkit
 
