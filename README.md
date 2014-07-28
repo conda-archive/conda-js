@@ -47,12 +47,32 @@ incomplete and will break the library).
 
 ## Contexts
 
+To control the method `conda-js` uses to make its requests and where it
+makes its requests, set `API_METHOD` and `API_ROOT`. `API_METHOD` should be
+either `"RPC"` (default) or `"REST"`. `API_ROOT` should be the base URL of
+the API routes (e.g. `/api` or `http://remote-server.com/conda/api`).
+
 Applications interacting with multiple Conda installations need to configure
 `conda.API_ROOT` and `conda.API_METHOD` accordingly. However, these are
-globals and setting them for one installation will interfere with operations
-on others. Thus, `conda-js` contains a function `conda.newContext` that
-creates a new `conda` library object with its own globals. Create one for
-each configuration.
+globals and configuring them for one installation will interfere with
+operations on others. Thus, `conda-js` contains a function
+`conda.newContext` that creates a new `conda` library object with its own
+globals. Create one for each configuration. This method is only available
+in a browser-like context (browser, Node-Webkit, or Atom Shell).
+
+Example:
+
+    // ... define test functions
+    var conda = window.nodeRequire('conda');
+    conda.API_METHOD = 'RPC';
+    conda.API_ROOT = 'http://localhost:8000/api';
+    
+    var context = conda.newContext();
+    context.API_METHOD = 'REST';
+    context.API_ROOT = 'http://localhost:8001/api';
+
+    test(conda);
+    test(context);
 
 ## Testing and Development Server
 
