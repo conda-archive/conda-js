@@ -311,11 +311,15 @@ function test(conda) {
     });
 }
 
-test(conda);
+describe('conda-js RPC mode', function() {
+    test(conda);
+});
 
 if (typeof conda.newContext !== "undefined") {
-    var context = conda.newContext();
-    context.API_METHOD = 'REST';
-    context.API_ROOT = 'http://localhost:8001/api';
-    test(context);
+    describe('conda-js REST mode', function() {
+        var context = conda.newContext();
+        context.API_METHOD = 'REST';
+        context.API_ROOT = 'http://localhost:8001/api';
+        test(context);
+    });
 }
