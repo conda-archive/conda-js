@@ -72,17 +72,19 @@ in a browser-like context (browser, Node-Webkit, or Atom Shell).
 
 Example:
 
-    // ... define test functions
-    var conda = window.nodeRequire('conda');
-    conda.API_METHOD = 'RPC';
-    conda.API_ROOT = 'http://localhost:8000/api';
-    
-    var context = conda.newContext();
-    context.API_METHOD = 'REST';
-    context.API_ROOT = 'http://localhost:8001/api';
+```javascript
+// ... define test functions
+var conda = window.nodeRequire('conda');
+conda.API_METHOD = 'RPC';
+conda.API_ROOT = 'http://localhost:8000/api';
 
-    test(conda);
-    test(context);
+var context = conda.newContext();
+context.API_METHOD = 'REST';
+context.API_ROOT = 'http://localhost:8001/api';
+
+test(conda);
+test(context);
+```
 
 ## Testing and Development Server
 
