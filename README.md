@@ -43,7 +43,7 @@ class Environments extends Backbone.Collection
   sync: conda.Env.backboneSync  # necessary for collection.fetch()
 ```
 
-Only `fetch` and `destroy` are supported.
+Only `Collection.fetch` and `Model.destroy` are supported.
 
 ### Usage under Atom Shell/node-webkit
 
