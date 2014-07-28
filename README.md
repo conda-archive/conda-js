@@ -97,9 +97,26 @@ and visit [http://localhost:8000](http://localhost:8000). Open the
 JavaScript console and begin using `conda-js`. If you wish to run tests for
 the AJAX part of the library as well, run
 
-    $ npm run-script pre-test
+    $ npm run-script pretest
 
-before starting the dev server.
+before starting the dev server; then mocha will begin running tests upon
+visiting localhost.
+
+The Python test server can be used as well:
+
+    $ python test.py
+
+Try
+
+    $ python test.py --help
+
+for more options. You may want to start both
+
+    $ python test.py
+    $ python test.py --rest --port=8001 --cross-origin
+
+to run the tests for contexts (the test script will run all the tests again,
+but using REST mode against `localhost:8001` instead of `localhost:8000`).
 
 To test the Node.js part of the library, run
 
