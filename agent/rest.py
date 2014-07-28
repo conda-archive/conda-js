@@ -76,8 +76,8 @@ def api_env(prefix=None, name=None, package=None):
     cmdList = parse(subcommand, flags, positional)
     return common.run(cmdList)
 
-@conda_js.route('/env/prefix/<prefix>/<package>/common.run')
-@conda_js.route('/env/name/<name>/<package>/common.run')
+@conda_js.route('/env/prefix/<prefix>/<package>/run')
+@conda_js.route('/env/name/<name>/<package>/run')
 def api_run(package, prefix=None, name=None):
     flags = get_flags()
     if prefix:
@@ -85,7 +85,7 @@ def api_run(package, prefix=None, name=None):
     elif name:
         flags['name'] = name
 
-    cmdList = parse('common.run', flags, [package])
+    cmdList = parse('run', flags, [package])
     return common.run(cmdList)
 
 @conda_js.route('/config',
