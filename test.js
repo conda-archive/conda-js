@@ -219,8 +219,8 @@ function test(conda) {
 
             it('should parse RC parts', function() {
                 assert.deepEqual(conda.Package.parseVersion("1.2.3rc1").parts, [1, 2, 3]);
-                assert.deepEqual(conda.Package.parseVersion("1.2.3rc1").rc, 1);
-                assert.deepEqual(conda.Package.parseVersion("1.2.3").rc, null);
+                assert.deepEqual(conda.Package.parseVersion("1.2.3rc1").suffixNumber, 1);
+                assert.deepEqual(conda.Package.parseVersion("1.2.3").suffix, null);
             });
         });
 
@@ -304,6 +304,32 @@ function test(conda) {
                     build_number: 3
                 }, {
                     version: "1.2.3rc2",
+                    build_number: 3
+                }));
+            });
+
+            it('should compare suffixes', function() {
+                assert.ok(conda.Package.isGreater({
+                    version: "1.2.3a",
+                    build_number: 3
+                }, {
+                    version: "1.2.3",
+                    build_number: 3
+                }));
+
+                assert.ok(conda.Package.isGreater({
+                    version: "1.2.3a2",
+                    build_number: 3
+                }, {
+                    version: "1.2.3a5",
+                    build_number: 3
+                }));
+
+                assert.ok(conda.Package.isGreater({
+                    version: "1.2.3a2",
+                    build_number: 3
+                }, {
+                    version: "1.2.3",
                     build_number: 3
                 }));
             });
