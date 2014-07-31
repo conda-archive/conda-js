@@ -785,7 +785,7 @@ function factory(api) {
            Note: 2.1.3a == 2.1.3a0
          */
         Package.parseVersion = function(version) {
-            var matches = version.match(/(\d+)\.(\d+)((?:\.\d+)*)([a-zA-Z]+(?:\d+)?)?/);
+            var matches = version.match(/^(\d+)\.(\d+)((?:\.\d+)*)([a-zA-Z]+(?:\d+)?)?$/);
             if (!matches) {
                 throw new CondaError("Package.parseVersion: Cannot parse version " + version);
             }
