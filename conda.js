@@ -668,7 +668,7 @@ function factory(api) {
 
         Env.getEnvs = function() {
             return info().then(function(info) {
-                var envs = [new Env('root', info.default_prefix)];
+                var envs = [new Env('root', info.root_prefix)];
 
                 var prefixes = info.envs;
                 for (var i = 0; i < prefixes.length; i++) {
@@ -688,8 +688,8 @@ function factory(api) {
 
         Env.getRoot = function() {
             return info().then(function(info) {
-                var root = new Env('root', info.default_prefix);
-                root.isDefault = true;
+                var root = new Env('root', info.root_prefix);
+                root.isDefault = info.root_prefix == info.default_prefix;
                 root.isRoot = true;
 
                 return root;
