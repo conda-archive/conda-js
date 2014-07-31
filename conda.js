@@ -282,6 +282,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
     }
 
     var __spawn = function(cmdList) {
+        console.log("RUNNING", cmdList)
         var conda = ChildProcess.spawn('conda', cmdList, { env: process.env });
         conda.stdout.setEncoding('utf8');
         return conda;
