@@ -1,11 +1,41 @@
+/**
+ * A Promise (similar to a jQuery `Deferred`) is used to represent an
+ * asynchronous operation.
+ *
+ * `conda-js` only rejects Promises if there was an error parsing the JSON
+ * from Conda. Else, the Promise will be fulfilled with the error object.
+ *
+ * @external Promise
+ */
+
+/**
+ * Helper function that patches a Promise object with methods to register
+ * callbacks for progress support.
+ *
+ * These methods will exist on any {@link external:Promise} that comes from
+ * a method called with `progress: true`.
+ *
+ * @private
+ */
 var __makeProgressPromise = function(promise) {
     var callbacks = [];
 
+    /**
+     * Adds a callback to be called when progress info is received.
+     *
+     * @memberof! external:Promise#
+     */
     promise.progress = function(f) {
         callbacks.push(f);
         return this;
     };
 
+    /**
+     * Fires the progress event.
+     *
+     * @memberof! external:Promise
+     * @private
+     */
     promise.onProgress = function(data) {
         callbacks.forEach(function(f) { f(data); });
     };
@@ -224,6 +254,15 @@ function apiContext() {
     return api;
 }
 
+/**
+   Creates a new `conda-js` context.
+
+   A context is a copy of the `conda-js` library with its own globals,
+   intended to let a single app communicate with multiple remote servers
+   with different configurations.
+
+   @memberof conda
+ */
 var newContext = function() {
     var api = apiContext();
     var conda = factory(api);
@@ -411,12 +450,34 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
 }
 else {
     // We are in the browser
+    /**
+     * `conda-js` methods generally take an options object and return a
+     * {@link external:Promise}. The options each method takes are the same
+     * as its command-line counterpart, simply covert to camelCase. For
+     * instance, `--use-index-cache` becomes `{ useIndexCache: true }`.
+     *
+     * If you want progress information, pass `{ progress: true }` and use
+     * {@link external:Promise#progress}.
+     *
+     * @namespace conda
+     */
     window.conda = newContext();
     window.conda.newContext = newContext;
 }
 
 function factory(api) {
     "use strict";
+
+    /**
+     * Make a call to the Conda API. Only available in Node.js.
+     *
+     * @function api
+     * @inner
+     * @memberof conda
+     * @param {string} command - the Conda subcommand to run.
+     * @param {Object} flags - the switches to pass to Conda.
+     * @param {string[]} [positional] - positional arguments to pass to Conda.
+     */
 
     // TODO make this context-dependent
     var PATH_SEP = '/';
@@ -461,6 +522,11 @@ function factory(api) {
         return options;
     };
 
+    /**
+     * Exception type used by conda-js.
+     *
+     * @memberof conda
+     */
     var CondaError = (function() {
         function CondaError(message) {
             this.message = message;
@@ -476,7 +542,19 @@ function factory(api) {
         return CondaError;
     })();
 
+    /**
+     * A Conda environment.
+     *
+     * This object is a thin wrapper that by default contains only the name
+     * and prefix of the environment, as well as methods to manipulate the
+     * environment. Generally this should not be instantiated directly.
+     *
+     * @class Env
+     */
     var Env = (function() {
+        /**
+           @constructor
+        */
         function Env(name, prefix) {
             this.name = name;
             this.prefix = prefix;
@@ -488,6 +566,11 @@ function factory(api) {
             this.history = [];
         }
 
+        /**
+         * List all linked packages in the environment.
+         *
+         * @memberof Env
+        */
         Env.prototype.linked = function(options) {
             options = defaultOptions(options, { simple: false });
 
@@ -510,6 +593,11 @@ function factory(api) {
             }.bind(this));
         };
 
+        /**
+         * Get a list of revisions of this environment.
+         *
+         * @memberof Env
+        */
         Env.prototype.revisions = function() {
             return api('list', { prefix: this.prefix, revisions: true })
                 .then(function(revisions) {
@@ -518,6 +606,11 @@ function factory(api) {
                 }.bind(this));
         };
 
+        /**
+         * Install packages in this environment (or revert to a revision).
+         *
+         * @memberof Env
+        */
         Env.prototype.install = function(options) {
             options = defaultOptions(options, {
                 progress: false,
@@ -538,6 +631,11 @@ function factory(api) {
             return api('install', options, packages);
         };
 
+        /**
+         * Update packages in this environment.
+         *
+         * @memberof Env
+        */
         Env.prototype.update = function(options) {
             options = defaultOptions(options, {
                 packages: [],
@@ -565,6 +663,11 @@ function factory(api) {
             return api('update', options, packages);
         };
 
+        /**
+         * Remove packages in this environment.
+         *
+         * @memberof Env
+        */
         Env.prototype.remove = function(options) {
             options = defaultOptions(options, {
                 progress: false,
@@ -585,6 +688,11 @@ function factory(api) {
             return api('remove', options, packages);
         };
 
+        /**
+         * Clone this environment.
+         *
+         * @memberof Env
+        */
         Env.prototype.clone = function(options) {
             var options = nameOrPrefixOptions("Env.clone", options, {
                 progress: false
@@ -605,6 +713,11 @@ function factory(api) {
             });
         };
 
+        /**
+         * Run an app installed in this environment.
+         *
+         * @memberof Env
+        */
         Env.prototype.run = function(options) {
             var options = defaultOptions(options, {
                 name: null,
@@ -626,6 +739,11 @@ function factory(api) {
             return api('run', { prefix: this.prefix }, [pkg]);
         };
 
+        /**
+         * Delete this environment (`conda remove --all`).
+         *
+         * @memberof Env
+        */
         Env.prototype.removeEnv = function(options) {
             options = defaultOptions(options, {
                 progress: false,
@@ -640,6 +758,12 @@ function factory(api) {
             });
         };
 
+        /**
+         * Create a new environment with the given packages installed.
+         *
+         * @static
+         * @memberof Env
+        */
         Env.create = function(options) {
             var options = nameOrPrefixOptions("Env.create", options, {
                 progress: false,
@@ -666,6 +790,13 @@ function factory(api) {
             return promise;
         };
 
+        /**
+         * Get all environments known to conda. This is the method you
+         * should use to create Env objects.
+         *
+         * @static
+         * @memberof Env
+        */
         Env.getEnvs = function() {
             return info().then(function(info) {
                 var envs = [new Env('root', info.root_prefix)];
@@ -686,6 +817,12 @@ function factory(api) {
             });
         };
 
+        /**
+         * Get the root environment (assumed to be named `'root'`).
+         *
+         * @static
+         * @memberof Env
+        */
         Env.getRoot = function() {
             return info().then(function(info) {
                 var root = new Env('root', info.root_prefix);
@@ -697,7 +834,11 @@ function factory(api) {
         };
 
         /**
-           Sync method for Backbone collections.
+         * Sync method for Backbone collections and models. Supports
+         * Collection#fetch and Model#destroy.
+         *
+         * @static
+         * @memberof Env
          */
         Env.backboneSync = function(method, model, options) {
             switch (method) {
@@ -737,18 +878,18 @@ function factory(api) {
             }
         };
 
-        /**
-           Construct an instance of this class from JSON.
-
-           Intended to be used as the model attribute for a Backbone
-           Collection when the server is exposing a RESTful API.
-         */
-        Env.backboneModel = function(data) {
-        };
-
         return Env;
     })();
 
+    /**
+     * A Conda package.
+     *
+     * This object carries the information from the search index, and is
+     * similar to Python `conda.plan.Package`. Generally this will not be
+     * directly instantiated either.
+     *
+     * @class Package
+     */
     var Package = (function() {
         var _cache = {};
 
@@ -769,6 +910,16 @@ function factory(api) {
             }.bind(this));
         };
 
+        /**
+         * Parse a filename like `python-2.7.8-0`.
+         *
+         * @static
+         * @memberof Package
+         * @returns {Object} info
+         * @returns {string} info.name
+         * @returns {string} info.version
+         * @returns {string} info.build
+         */
         Package.splitFn = function(fn) {
             var parts = fn.split('-');
             return {
@@ -779,10 +930,18 @@ function factory(api) {
         };
 
         /**
-           Parse a version string
-
-           Matches 2.1, 2.1.3, 2.1.3a, 2.1.3a2, 2.1.4rc1, 2.1.5.2, ...
-           Note: 2.1.3a == 2.1.3a0
+         * Parse a version string into its parts.
+         *
+         * Matches 2.1, 2.1.3, 2.1.3a, 2.1.3a2, 2.1.4rc1, 2.1.5.2, ...
+         *
+         * Note: 2.1.3a == 2.1.3a0
+         *
+         * @static
+         * @memberof Package
+         * @returns {Object} version
+         * @returns {number[]} version.parts - the version numbers
+         * @returns {string} version.suffix - the suffix (`a`, `rc`)
+         * @returns {number} version.suffixNumber - the suffix number (defaults to 0)
          */
         Package.parseVersion = function(version) {
             var matches = version.match(/^(\d+)\.(\d+)((?:\.\d+)*)([a-zA-Z]+(?:\d+)?)?$/);
@@ -815,7 +974,12 @@ function factory(api) {
             };
         };
 
-        /** Is pkg2 newer than pkg1
+        /**
+         * Is pkg2 newer than pkg1
+         *
+         * @static
+         * @memberof Package
+         * @returns {boolean}
          */
         Package.isGreater = function(pkg1, pkg2) {
             if (pkg1.version === pkg2.version) {
@@ -866,6 +1030,20 @@ function factory(api) {
             }
         };
 
+        /**
+         * Load a package object from the package index.
+         *
+         * The packages returned are CACHED and MUTABLE. Make a copy if you
+         * plan to mutate the object, or otherwise the changes will propagate.
+         *
+         * Used by {@link Env#linked}.
+         *
+         * @static
+         * @todo It may be better not to cache package objects themselves,
+         * only the index, except if we had to fall back on `conda info` to
+         * get the data.
+         * @memberof Package
+         */
         Package.load = function(fn, reload) {
             // This can get quite expensive. To deal with that:
             // 1. Cache Package objects.
@@ -908,6 +1086,16 @@ function factory(api) {
         return Package;
     })();
 
+    /**
+     * A Conda configuration file.
+     *
+     * This object is a thin wrapper that by default contains either the
+     * name of the config file or a flag indicating we are using the system
+     * config file. If instantiated with neither, this will use whatever
+     * Conda picks as the default.
+     *
+     * @class Config
+     */
     var Config = (function() {
         var __warn_result = function(result) {
             if (result.warnings && result.warnings.length) {
@@ -963,6 +1151,11 @@ function factory(api) {
             }
         }
 
+        /*
+         * The path of the config file, as reported by Conda.
+         *
+         * @memberof Config
+         */
         Config.prototype.rcPath = function() {
             var call = api('config', __merge({ get: true }, this.options));
             return call.then(function(result) {
@@ -970,6 +1163,14 @@ function factory(api) {
             });
         };
 
+        /*
+         * Get a configuration key's value.
+         *
+         * @memberof! Config
+         * @returns {Object} info
+         * @returns info.value - undefined if not set.
+         * @returns {boolean} info.set
+         */
         Config.prototype.get = __check_keys(function(key) {
             var call = api('config', __merge({ get: key }, this.options));
             return call.then(__warn_result).then(function(result) {
@@ -1019,10 +1220,32 @@ function factory(api) {
         return Config;
     })();
 
+    /**
+     * Get info about a Conda install - `conda info --json`.
+     *
+     * Unlike its command line counterpart, this accepts no parameters.
+     *
+     * @memberof conda
+     * @function
+     */
     var info = function() {
         return api('info');
     };
 
+    /**
+     * Fetch the package index - `conda search --json`.
+     *
+     * This is an expensive call - you should favor {@link conda.index}
+     * unless you absolutely need the latest data. And even then
+     * `conda.index({ reload: true })` would likely be better (as then
+     * future callers will get the updated index).
+     *
+     * @param {Object} [options]
+     * @param {string} [options.regex] - a regex to filter package names
+     * @param {string} [options.spec] - a package specification to search for
+     * @memberof conda
+     * @function
+     */
     var search = function(options) {
         options = defaultOptions(options, {
             regex: null,
@@ -1053,12 +1276,18 @@ function factory(api) {
         return api('search', options, positional);
     };
 
-    /**
-       The package index - conda search --json.
-
-       This method caches the index as it is an expensive call (1-4 seconds).
-     */
     var _search_cache = null;
+    /**
+     * The package index - `conda search --json`.
+     *
+     * This method caches the index as it is an expensive call (1-4
+     * seconds). Any parameters will be passed through.
+     *
+     * @param {Object} [options]
+     * @param {boolean} [options.reload=false] - reload the index, instead of using the cache.
+     * @memberof conda
+     * @function
+     */
     var index = function(options) {
         options = defaultOptions(options, {
             reload: false
@@ -1073,10 +1302,22 @@ function factory(api) {
         return _search_cache;
     };
 
+    /**
+     * `conda run --json`.
+     *
+     * @memberof conda
+     * @function
+     */
     var run = function(command) {
         return api('run', {}, [command]);
     };
 
+    /**
+     * `conda clean --json`.
+     *
+     * @memberof conda
+     * @function
+     */
     var clean = function(options) {
         options = defaultOptions(options, {
             dryRun: false,

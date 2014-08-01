@@ -13,6 +13,7 @@
     "sockjs": "^0.3.9"
   },
   "scripts": {
+    "doc": "jsdoc conda.js -d doc -c docconf.json README.md",
     "pretest": "node_modules/.bin/browserify test.js -o test.browser.js",
     "test": "node_modules/.bin/mocha -t 10s --reporter spec --slow 2s"
   }

@@ -2,6 +2,16 @@
 
 A library to interact with `conda` from both the browser and Node.js
 
+## Documentation
+
+From the root of this repo run
+
+    $ npm install [-g] jsdoc
+
+then
+
+    $ npm run-script doc
+
 ## Usage as a Library
 
 From Node.js:
