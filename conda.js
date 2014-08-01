@@ -437,7 +437,7 @@ if ((typeof module === 'object' && typeof define !== 'function') || (window && w
     if (typeof window !== "undefined" && typeof window.nodeRequire !== "undefined") {
         window.conda = factory(api);
         window.conda.api = api;
-        window.conda.progressApi = api;
+        window.conda.progressApi = progressApi;
         // For node-webkit/Atom Shell we provide the browser API as well, as
         // these environments are a mix of Node and browser
         window.conda.newContext = newContext;
@@ -474,9 +474,9 @@ function factory(api) {
      * @function api
      * @inner
      * @memberof conda
-     * @param {string} command - the Conda subcommand to run.
+     * @param {String} command - the Conda subcommand to run.
      * @param {Object} flags - the switches to pass to Conda.
-     * @param {string[]} [positional] - positional arguments to pass to Conda.
+     * @param {String[]} [positional] - positional arguments to pass to Conda.
      */
 
     // TODO make this context-dependent
@@ -916,9 +916,9 @@ function factory(api) {
          * @static
          * @memberof Package
          * @returns {Object} info
-         * @returns {string} info.name
-         * @returns {string} info.version
-         * @returns {string} info.build
+         * @returns {String} info.name
+         * @returns {String} info.version
+         * @returns {String} info.build
          */
         Package.splitFn = function(fn) {
             var parts = fn.split('-');
@@ -940,7 +940,7 @@ function factory(api) {
          * @memberof Package
          * @returns {Object} version
          * @returns {number[]} version.parts - the version numbers
-         * @returns {string} version.suffix - the suffix (`a`, `rc`)
+         * @returns {String} version.suffix - the suffix (`a`, `rc`)
          * @returns {number} version.suffixNumber - the suffix number (defaults to 0)
          */
         Package.parseVersion = function(version) {
@@ -1113,6 +1113,12 @@ function factory(api) {
 
             return dest;
         };
+        /**
+         * The list of allowed keys.
+         *
+         * @inner
+         * @memberof Config
+         */
         var ALLOWED_KEYS = ['channels', 'disallow', 'create_default_packages',
             'track_features', 'envs_dirs', 'always_yes', 'allow_softlinks', 'changeps1',
             'use_pip', 'binstar_upload', 'binstar_personal', 'show_channel_urls',
@@ -1151,7 +1157,7 @@ function factory(api) {
             }
         }
 
-        /*
+        /**
          * The path of the config file, as reported by Conda.
          *
          * @memberof Config
@@ -1163,10 +1169,12 @@ function factory(api) {
             });
         };
 
-        /*
+        /**
          * Get a configuration key's value.
          *
-         * @memberof! Config
+         * @memberof Config
+         * @function
+         * @param {String} key
          * @returns {Object} info
          * @returns info.value - undefined if not set.
          * @returns {boolean} info.set
@@ -1189,6 +1197,12 @@ function factory(api) {
             });
         });
 
+        /**
+         * Get all set configuration values.
+         *
+         * @function
+         * @memberof Config
+         */
         Config.prototype.getAll = function() {
             var call = api('config', __merge({ get: true }, this.options));
             return call.then(function(result) {
@@ -1196,22 +1210,46 @@ function factory(api) {
             });
         };
 
+        /**
+         * Add a value to an (iterable) key.
+         *
+         * @function
+         * @memberof Config
+         */
         // TODO disallow non iterable keys
         Config.prototype.add = __check_keys(function(key, value) {
             var call = api('config', __merge({ add: [key, value], force: true }, this.options));
             return call.then(__warn_result);
         });
 
+        /**
+         * Set the value of a (boolean) key.
+         *
+         * @function
+         * @memberof Config
+         */
         Config.prototype.set = __check_keys(function(key, value) {
             var call = api('config', __merge({ set: [key, value], force: true }, this.options));
             return call.then(__warn_result);
         });
 
+        /**
+         * Remove the value from an (iterable) key.
+         *
+         * @function
+         * @memberof Config
+         */
         Config.prototype.remove = __check_keys(function(key, value) {
             var call = api('config', __merge({ remove: [key, value], force: true }, this.options));
             return call.then(__warn_result);
         });
 
+        /**
+         * Remove a key entirely.
+         *
+         * @function
+         * @memberof Config
+         */
         Config.prototype.removeKey = __check_keys(function(key) {
             var call = api('config', __merge({ removeKey: key, force: true }, this.options));
             return call.then(__warn_result);
@@ -1241,8 +1279,8 @@ function factory(api) {
      * future callers will get the updated index).
      *
      * @param {Object} [options]
-     * @param {string} [options.regex] - a regex to filter package names
-     * @param {string} [options.spec] - a package specification to search for
+     * @param {String} [options.regex] - a regex to filter package names
+     * @param {String} [options.spec] - a package specification to search for
      * @memberof conda
      * @function
      */
